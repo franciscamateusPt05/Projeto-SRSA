@@ -1,17 +1,35 @@
 import paho.mqtt.client as mqtt
+import RPi.GPIO as GPIO
+import time
 
 # --- Configurações ---
 GROUP_ID = 1
-MQTT_BROKER = "broker.hivemq.com"  # Broker Mosquitto
+MQTT_BROKER = "broker.hivemq.com"
 MQTT_PORT = 1883
 BASE_TOPIC = f"machine_{GROUP_ID}/#"
 
 device_on = False
-
 last_temperature = None
 last_pressure = None
 last_rpm = None
 
+# --- GPIO Setup ---
+LED_GREEN = 17
+LED_YELLOW = 27
+LED_RED = 22
+BUZZER = 23
+
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(LED_GREEN, GPIO.OUT)
+GPIO.setup(LED_YELLOW, GPIO.OUT)
+GPIO.setup(LED_RED, GPIO.OUT)
+GPIO.setup(BUZZER, GPIO.OUT)
+
+def reset_outputs():
+    GPIO.output(LED_GREEN, False)
+    GPIO.output(LED_YELLOW, False)
+    GPIO.output(LED_RED, False)
+    GPIO.output(BUZZER, False)
 
 def check_sensor_health():
     global last_temperature, last_pressure, last_rpm
@@ -19,17 +37,10 @@ def check_sensor_health():
     if last_temperature is None or last_pressure is None or last_rpm is None:
         return "disconnected"
 
-    # Flags de estado
-    temp_valid = 10 <= last_temperature <= 200
     temp_healthy = 90 <= last_temperature <= 105
-
-    pressure_valid = 0 <= last_pressure <= 8
     pressure_healthy = 1 <= last_pressure <= 5
-
-    rpm_valid = 0 <= last_rpm <= 4000
     rpm_healthy = last_rpm <= 2500
 
-    # Verifica se sensores estão fora de faixa
     if not temp_healthy and not pressure_healthy:
         return "danger"
     elif not temp_healthy or not pressure_healthy:
@@ -39,12 +50,30 @@ def check_sensor_health():
     else:
         return "ok"
 
+def update_outputs(status):
+    reset_outputs()
+
+    if status == "ok":
+        GPIO.output(LED_GREEN, True)
+        print("Ok (Green LED ON) Temperature and pressure within healthy ranges")
+    elif status == "problem":
+        GPIO.output(LED_YELLOW, True)
+        print("Problem (Yellow LED ON) Temperature or pressure out of healthy ranges")
+    elif status == "danger":
+        GPIO.output(LED_RED, True)
+        print("Danger (Red LED ON) Temperature and pressure outside healthy ranges")
+    elif status == "rpm_warning":
+        GPIO.output(BUZZER, True)
+        print("RPM above limit (Buzzer ON) RPM out of healthy range")
+    elif status == "disconnected":
+        GPIO.output(LED_RED, True)
+        GPIO.output(BUZZER, True)
+        print("Machine sensors disconnected (Red LED Flashes and buzzer ON)")
 
 def on_connect(client, userdata, flags, rc):
     if rc == 0:
         print("Conectado ao Broker MQTT!")
         client.subscribe(BASE_TOPIC)
-
 
 def on_message(client, userdata, msg):
     global device_on, last_temperature, last_pressure, last_rpm
@@ -56,14 +85,11 @@ def on_message(client, userdata, msg):
         if payload == "1":
             device_on = True
             print("Dispositivo LIGADO")
-
-
         elif payload == "0":
             device_on = False
             print("Dispositivo DESLIGADO")
-
+            reset_outputs()
         else:
-            # Para qualquer outro tipo de mensagem enviada pelo controller
             print(payload)
         return
 
@@ -75,36 +101,15 @@ def on_message(client, userdata, msg):
                 last_pressure = float(payload)
             elif topic == f"machine_{GROUP_ID}/rpm":
                 last_rpm = float(payload)
-            elif topic == f"machine_{GROUP_ID}/controller":
-                print(payload)
 
             status = check_sensor_health()
-
-            if status == "ok":
-                print(
-                    "Ok (Green LED ON) Temperature and pressure within healthy ranges"
-                )
-            elif status == "problem":
-                print(
-                    "Problem (Yellow LED ON) Temperature or pressure out of healthy ranges"
-                )
-            elif status == "danger":
-                print(
-                    "Danger (Red LED ON) Temperature and pressure outside healthy ranges"
-                )
-            elif status == "rpm_warning":
-                print("RPM above limit (Buzzer ON) RPM out of healthy range")
-            elif status == "disconnected":
-                print("Machine sensors disconnected (Red LED Flashes and buzzer ON)")
-
+            update_outputs(status)
 
         except ValueError:
             print("Erro ao converter os dados do sensor.")
 
-
-# --- Configuração do Cliente MQTT ---
+# --- MQTT Client ---
 client = mqtt.Client()
-# client.username_pw_set("srsa_sub", "srsa_password")
 client.on_connect = on_connect
 client.on_message = on_message
 
@@ -115,3 +120,5 @@ try:
 except KeyboardInterrupt:
     print("Desligando subscriber...")
     client.disconnect()
+    reset_outputs()
+    GPIO.cleanup()
