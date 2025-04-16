@@ -3,17 +3,18 @@ import random
 import time
 import os
 
+Group_ID = 1
 # === RANGES ===
 temp = [10, 200]
 oil = [0, 8]
 rpm = [0, 4000]
 
 # === TOPICS ===
-topic_temp = "machine/coolant"
-topic_oil = "machine/pressure"
-topic_rpm = "machine/rpm"
+topic_temp = f"machine_{Group_ID}/coolant"
+topic_oil = f"machine_{Group_ID}/pressure"
+topic_rpm = f"machine_{Group_ID}/rpm"
 
-topic_controller = "machine/controller"
+topic_controller = f"machine_{Group_ID}/controller"
 
 will_message = "SENSORS DISCONNECTED UNEXPECTEDLY"
 

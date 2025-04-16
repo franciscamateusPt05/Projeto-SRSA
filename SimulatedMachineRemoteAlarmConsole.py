@@ -4,7 +4,7 @@ import paho.mqtt.client as mqtt
 GROUP_ID = "1"
 MQTT_BROKER = "10.6.1.10"  # Broker Mosquitto
 MQTT_PORT = 1883
-BASE_TOPIC = f"machine_{GROUP_ID}/#"  # Curinga para todos os subtópicos
+BASE_TOPIC = f"machine_{GROUP_ID}/#"
 
 device_on = False
 
@@ -30,7 +30,7 @@ def check_sensor_health():
     rpm_healthy = last_rpm <= 2500
 
     # Verifica se sensores estão fora de faixa
-    if not temp_valid and not pressure_valid:
+    if not temp_healthy and not pressure_healthy:
         return "danger"
     elif not temp_healthy or not pressure_healthy:
         return "problem"
@@ -46,7 +46,6 @@ def on_connect(client, userdata, flags, rc):
         client.subscribe(BASE_TOPIC)
 
 
-
 def on_message(client, userdata, msg):
     global device_on, last_temperature, last_pressure, last_rpm
 
@@ -60,7 +59,10 @@ def on_message(client, userdata, msg):
         elif payload == "0":
             device_on = False
             print("Dispositivo DESLIGADO")
+        else:
+            print(payload)
         return
+
     if device_on:
         try:
             if topic == f"machine_{GROUP_ID}/temperature":
@@ -73,11 +75,17 @@ def on_message(client, userdata, msg):
             status = check_sensor_health()
 
             if status == "ok":
-                print("Ok (Green LED ON) Temperature and pressure within healthy ranges")
+                print(
+                    "Ok (Green LED ON) Temperature and pressure within healthy ranges"
+                )
             elif status == "problem":
-                print("Problem (Yellow LED ON) Temperature or pressure out of healthy ranges")
+                print(
+                    "Problem (Yellow LED ON) Temperature or pressure out of healthy ranges"
+                )
             elif status == "danger":
-                print("Danger (Red LED ON) Temperature and pressure outside healthy ranges")
+                print(
+                    "Danger (Red LED ON) Temperature and pressure outside healthy ranges"
+                )
             elif status == "rpm_warning":
                 print("RPM above limit (Buzzer ON) RPM out of healthy range")
             elif status == "disconnected":
@@ -89,7 +97,7 @@ def on_message(client, userdata, msg):
 
 # --- Configuração do Cliente MQTT ---
 client = mqtt.Client()
-#client.username_pw_set("srsa_sub", "srsa_password")
+# client.username_pw_set("srsa_sub", "srsa_password")
 client.on_connect = on_connect
 client.on_message = on_message
 
