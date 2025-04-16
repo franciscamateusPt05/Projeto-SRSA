@@ -1,8 +1,10 @@
 import paho.mqtt.client as mqtt
 
+
+Group_ID = 1
 BROKER = "broker.hivemq.com"
 PORT = 1883
-TOPIC = "machine/controller"
+TOPIC = f"machine_{Group_ID}/controller"
 
 
 def on_connect(client, userdata, flags, rc):
