@@ -1,6 +1,5 @@
 import paho.mqtt.client as mqtt
 
-
 BROKER = "broker.hivemq.com"
 PORT = 1883
 TOPIC = "machine/controller"
@@ -25,7 +24,7 @@ client.loop_start()
 
 welcome = """\
 ======== CONTROL CONSOLE ===========
-========= TYPE 0 to turn OFF
+========= TYPE 0 to turn OFF ==========
 ========= TYPE 1 to turn ON ===========
 """
 print(welcome)
