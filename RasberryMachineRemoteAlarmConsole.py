@@ -15,7 +15,7 @@ last_rpm = None
 
 # --- GPIO Setup ---
 LED_GREEN = 17
-LED_YELLOW = 27
+LED_YELLOW = 22
 LED_RED = 22
 BUZZER = 23
 
@@ -90,6 +90,9 @@ def on_message(client, userdata, msg):
             print("Dispositivo DESLIGADO")
             reset_outputs()
         else:
+            reset_outputs()
+            GPIO.output(LED_RED, True)
+            GPIO.output(BUZZER, True)
             print(payload)
         return
 
