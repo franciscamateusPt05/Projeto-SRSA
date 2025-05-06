@@ -3,7 +3,7 @@ import random
 import time
 import os
 
-Group_ID = 1
+Group_ID = 11
 # === RANGES ===
 temp = [10, 200]
 oil = [0, 8]
@@ -18,7 +18,7 @@ topic_controller = f"machine_{Group_ID}/controller"
 
 will_message = "SENSORS DISCONNECTED UNEXPECTEDLY"
 
-BROKER = "broker.hivemq.com"
+BROKER = "10.6.1.71"
 PORT = 1883
 
 active = False

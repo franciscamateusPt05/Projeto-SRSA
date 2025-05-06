@@ -3,8 +3,8 @@ import RPi.GPIO as GPIO
 import time
 
 # --- Configurações ---
-GROUP_ID = 1
-MQTT_BROKER = "broker.hivemq.com"
+GROUP_ID = 11
+MQTT_BROKER = "10.6.1.71"
 MQTT_PORT = 1883
 BASE_TOPIC = f"machine_{GROUP_ID}/#"
 
@@ -14,10 +14,10 @@ last_pressure = None
 last_rpm = None
 
 # --- GPIO Setup ---
-LED_GREEN = 17
-LED_YELLOW = 22
+LED_GREEN = 26
+LED_YELLOW = 6
 LED_RED = 22
-BUZZER = 23
+BUZZER = 12
 
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(LED_GREEN, GPIO.OUT)
@@ -25,11 +25,13 @@ GPIO.setup(LED_YELLOW, GPIO.OUT)
 GPIO.setup(LED_RED, GPIO.OUT)
 GPIO.setup(BUZZER, GPIO.OUT)
 
+
 def reset_outputs():
     GPIO.output(LED_GREEN, False)
     GPIO.output(LED_YELLOW, False)
     GPIO.output(LED_RED, False)
     GPIO.output(BUZZER, False)
+
 
 def check_sensor_health():
     global last_temperature, last_pressure, last_rpm
@@ -49,6 +51,7 @@ def check_sensor_health():
         return "rpm_warning"
     else:
         return "ok"
+
 
 def update_outputs(status):
     reset_outputs()
@@ -70,10 +73,12 @@ def update_outputs(status):
         GPIO.output(BUZZER, True)
         print("Machine sensors disconnected (Red LED Flashes and buzzer ON)")
 
+
 def on_connect(client, userdata, flags, rc):
     if rc == 0:
         print("Conectado ao Broker MQTT!")
         client.subscribe(BASE_TOPIC)
+
 
 def on_message(client, userdata, msg):
     global device_on, last_temperature, last_pressure, last_rpm
@@ -110,6 +115,7 @@ def on_message(client, userdata, msg):
 
         except ValueError:
             print("Erro ao converter os dados do sensor.")
+
 
 # --- MQTT Client ---
 client = mqtt.Client()
