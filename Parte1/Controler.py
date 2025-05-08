@@ -2,7 +2,7 @@ import paho.mqtt.client as mqtt
 
 
 Group_ID = 11
-BROKER = "10.6.1.71"
+BROKER = "10.6.1.9"
 PORT = 1883
 TOPIC = f"machine_{Group_ID}/controller"
 

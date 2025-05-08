@@ -18,7 +18,7 @@ topic_controller = f"machine_{Group_ID}/controller"
 
 will_message = "SENSORS DISCONNECTED UNEXPECTEDLY"
 
-BROKER = "10.6.1.71"
+BROKER = "10.6.1.9"
 PORT = 1883
 
 active = False
