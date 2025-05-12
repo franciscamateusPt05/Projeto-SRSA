@@ -68,4 +68,4 @@ def start_server(host,port):
         client_handler.start()
 
 if __name__ == "__main__":
-    start_server()
+    start_server("localhost",54321)
