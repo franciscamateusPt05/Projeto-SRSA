@@ -23,7 +23,7 @@ try:
         data = {"Temperature":temperature,"Humidity":humidity,"Motion":motion}
 
         client.publish(topic,json.dumps(data))
-       print(f"Published: {data}")
+        print(f"Published: {data}")
         time.sleep(5)
 
 except KeyboardInterrupt:
