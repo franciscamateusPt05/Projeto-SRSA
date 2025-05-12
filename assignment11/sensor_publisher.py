@@ -6,7 +6,7 @@ import json
 
 
 GroupID = sys.argv[1]
-topic = f'{GroupID}/sensor_data'
+topic = f'Group{GroupID}/sensor_data'
 
 broker = "10.6.1.9"
 port = 1883
