@@ -88,17 +88,58 @@ Machine_Data= {
   } 
 }
 
-def normalizeTemp(Ftemperature):
-    pass
 
-def normalizeOil(PsiOil):
-    pass
+def generateRPM(alarmon:bool,toadd = 0):
+  global Machine_Data
+  if alarmon:
+    rpm  = Machine_Data["decoded_payload"]['rpm'] + toadd
+  elif !brokenmachine:
+    rpm = Mahcine_Data["decodec_payload"]['rpm'] + random.choice([-50,200])
+  else:
+    rpm = Machine_Data["decoded_payload"]['rpm'] + 100
 
-def normalizePotential(mV):
-    pass
+    Machine_Date["decoded_payload"]['rpm'] = max(800,min(rpm,3000))
 
-def normalizeConsumption(gal):
-    pass 
+
+def generateOilPressure(alarmon:bool,toadd = 0):
+  global Machine_Data
+  if alarmon:
+    oilpressure  = Machine_Data["decoded_payload"]['oil_pressure'] + toadd
+  elif !brokenmachine:
+    oilpressure = Mahcine_Data["decodec_payload"]['oil_pressure'] + random.choice([-0.1,0.5])
+  else:
+    oilpressure = Machine_Data["decoded_payload"]['oil_pressure'] + 1.0
+
+    Machine_Date["decoded_payload"]['oil_pressure'] = max(1.5,min(oilpressure,8.0))
+
+
+
+def generatePotential(alarmon:bool,toadd = 0):
+  global Machine_Data
+  if alarmon:
+    batterypotential  = Machine_Data["decoded_payload"]['rpm'] + toadd
+  elif !brokenmachine:
+    batterypotential = Mahcine_Data["decodec_payload"]['rpm'] + random.choice([-50,200])
+  else:
+    batterypotential = Machine_Data["decoded_payload"]['rpm'] + 100
+    batterypotential = max(10,min(battery_potential),14)
+    Machine_Date["decoded_payload"]['battery_potential'] = batterypotential
+
+
+
+def generateRPM(alarmon:bool,toadd = 0):
+  global Machine_Data
+  if alarmon:
+    rpm  = Machine_Data["decoded_payload"]['rpm'] + toadd
+  elif !brokenmachine:
+    rpm = Mahcine_Data["decodec_payload"]['rpm'] + random.choice([-50,200])
+  else:
+    rpm = Machine_Data["decoded_payload"]['rpm'] + 100
+
+    Machine_Date["decoded_payload"]['rpm'] = rpm
+
+
+
 
 
 def generatenewdata():
