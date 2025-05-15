@@ -18,21 +18,12 @@ latest_data = {}
 requestingclients = set()
 clients_lock = threading.Lock()
 
-def on_connect(client,userdata,flags,rc):
-    print("Server is connected to mqtt")
-    client.subscribe()
-    # yo
-
 def on_message(clietn,userdata,msg):
     global latest_data
     latest_data = json.loads(msg.payload.decode('utf-8'))
 
-mqtt_client.on_connect = onconnect
+mqtt_client.subscribe(topic)
 mqtt_client.on_message = on_message
-
-
-mqtt_client.connect(broker,broker_port)
-mqtt_client.loop_start()
 
 
 def handleClient_connections(client_socket):
@@ -46,10 +37,11 @@ def handleClient_connections(client_socket):
             message = data.decode('utf-8')
             if message == "REQUEST":
 
-            if latest_data:
-                    client_socket.send(json.dumps(latest_data).encode('utf-8'))
+                if latest_data:
+                    client_socket.sendall(json.dumps(latest_data).encode('utf-8'))
                 else:
-                    client_socket.send(b'No data available')
+                    client_socket.sendall(b'No data available')
+                # signalize this client and start sending him the data coming from the mqtt 
         except Exception as e:
             print(f'Error {e}')
             break
@@ -63,9 +55,8 @@ def start_server(host,port):
 
     while True:
         client_socket,addr = server_socket.accept()
-        print(f'Accepted Connection from {addr}')
         client_handler = threading.Thread(target=handleClient_connections,args=(client_socket,))
         client_handler.start()
 
 if __name__ == "__main__":
-    start_server("localhost",54321)
+    start_server()
