@@ -9,12 +9,11 @@ import paho.mqtt.client as mqtt
 GroupID = sys.argv[1]
 MACHINE_UPDATE_TIME = sys.argv[2] # pode ser alterado 
 Machine_Code = sys.argv[3]
-
 # TOPICOS
 # para enviar
 network_topic = f'v3/{GroupID}@ttn/devices/{MachineID}/up'
 # para receber
-DataManagerAgent_topic = f'v3/{GroupID}@ttn/devices/{MahcineID}/down/push_actuator'
+DataManagerAgent_topic = f'v3/{GroupID}@ttn/devices/{MachineID}/down/push_actuator'
 AlertManger_topic = f'v3/{GroupID}@ttn/devices/{MachineID}/down/push_alert'
 
 

@@ -3,6 +3,9 @@ import socket
 import json
 import time
 from datetime import datetime
+from influxdb_client import InfluxDBClient, Point, WritePrecision
+from influxdb_client.client.write_api import SYNCHRONOUS
+
 
 class DataManagerAgent:
     def __init__(self, group_id, machine_ids, broker_ip="10.6.1.9", broker_port=1883):
@@ -22,6 +25,7 @@ class DataManagerAgent:
         self.udp_socket.bind(('localhost', self.udp_port))
         
         # Internal state
+        self.CodeMachine={"A23X":"M1","B47Y":"M2","C89Z":"M3","D56W":"M4","E34V":"M5","F78T":"M6","G92Q":"M7","H65P":"M8"}
         self.machine_data = {mid: {} for mid in machine_ids}
         self.control_topic = f"v3/{self.group_id}/internal/control"
         
@@ -45,20 +49,19 @@ class DataManagerAgent:
             
             if "up" in topic:  # Message from machine
                 self.process_machine_message(payload, topic)
-            elif topic == self.control_topic:  # Message from Machine Data Manager
+            elif topic == self.control_topic:
                 self.process_control_message(payload)
                 
         except Exception as e:
             print(f"Error processing MQTT message: {e}")
     
     def process_machine_message(self, payload, topic):
-        # Extract machine ID from topic
         machine_id = topic.split('/')[4]
         
         # Extract and standardize sensor data
         decoded = payload.get('uplink_message', {}).get('decoded_payload', {})
         self.machine_data[machine_id] = {
-            'timestamp': datetime.now().isoformat(),
+            'timestamp': datetime.now().isoformat(), #Este é quando recebo devia ser o quando foi retirado o valor?
             'rpm': decoded.get('rpm'),
             'coolant_temp': decoded.get('coolant_temperature'),
             'oil_pressure': decoded.get('oil_pressure'),
@@ -69,8 +72,6 @@ class DataManagerAgent:
             'snr': payload.get('rx_metadata', [{}])[0].get('snr'),
             'channel_rssi': payload.get('rx_metadata', [{}])[0].get('channel_rssi')
         }
-        
-        # Standardize units if needed (implementation depends on your requirements)
         self.standardize_units(machine_id)
         
         # Forward to Machine Data Manager
@@ -82,31 +83,33 @@ class DataManagerAgent:
     def standardize_units(self, machine_id):
         data = self.machine_data[machine_id]
         machine_type = data['machine_type']
-        
-        # Example standardization - implement based on your requirements
-        if machine_type in ['B47Y', 'D56W', 'F78T', 'H65P']:
-            # Convert oil pressure from bar to psi if needed
+        if machine_type in ['A23X','C89Z','E34V','H65P']:
             if 'oil_pressure' in data:
-                data['oil_pressure'] = data['oil_pressure'] * 14.5038  # bar to psi
-        
-        # Similar conversions for temperature (°F to °C) and consumption (gal to l)
-    
+                data['oil_pressure'] = data['oil_pressure']*0.0689476
+        if machine_type in ['E34V', 'G92Q', 'F78T', 'H65P']:
+            if 'coolant_temp' in data:
+                data['coolant_temp'] = (data['coolant_temp'] - 32) * 5 / 9
+        if machine_type in ['H65P']:
+            if 'battery_potential' in data:
+                data['battery_potential'] = data['battery_potential']/1000
+        if machine_type in ['C89Z','B47Y','E34V','H65P']:
+            if 'battery_potential' in data:
+                data['battery_potential'] = data['battery_potential']/1000
+
     def send_to_data_manager(self, data):
-        # Publish to internal topic for Machine Data Manager
-        topic = f"v3/{self.group_id}/internal/machine_data"
+        topic = f"{self.group_id}/internal/machine_data"
         self.mqtt_client.publish(topic, json.dumps(data))
     
     def process_control_message(self, payload):
-        # Process message from Machine Data Manager
-        machine_id = payload.get('machine_id')
+        machine_type = payload.get('machine_type')
         action = payload.get('action')
         parameter = payload.get('parameter')
-        value = payload.get('value')
+        corretion=payload.get('corretion')
         
         # Encode control message
-        encoded = self.encode_control_message(action, parameter, value)
+        encoded = self.encode_control_message(action, parameter,corretion)
         
-        # Send to machine
+        machine_id=self.CodeMachine[machine_type]
         topic = f"v3/{self.group_id}@ttn/devices/{machine_id}/down/push_machine"
         downlink_msg = {
             "downlinks": [{
@@ -189,11 +192,8 @@ class DataManagerAgent:
         return f"0x{message_type:02x} 0x{action_type:02x} 0x{reason_byte:02x}"
     
     def store_in_database(self, data):
-        # Implement InfluxDB storage
-        # Example using influxdb-client (install with pip install influxdb-client)
-        from influxdb_client import InfluxDBClient, Point, WritePrecision
-        from influxdb_client.client.write_api import SYNCHRONOUS
-        
+
+
         # Configure with your InfluxDB Cloud credentials
         token = "your-token"
         org = "your-org"
