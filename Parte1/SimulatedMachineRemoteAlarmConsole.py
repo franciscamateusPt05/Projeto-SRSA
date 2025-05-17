@@ -1,8 +1,8 @@
 import paho.mqtt.client as mqtt
 
 # --- Configurações ---
-GROUP_ID = 1
-MQTT_BROKER = "broker.hivemq.com"  # Broker Mosquitto
+GROUP_ID = 11
+MQTT_BROKER = "10.6.1.9"  # Broker Mosquitto
 MQTT_PORT = 1883
 BASE_TOPIC = f"machine_{GROUP_ID}/#"
 
