@@ -24,6 +24,13 @@ mqttport = 1883
 
 client = mqtt.Client()
 
+def on_connect():
+  pass
+
+def on_message(topic):
+  if topic == 
+  pass
+
 
 
 unidades = {"OilPressure":[0,1,0,1,0,1,0,1],
@@ -106,24 +113,24 @@ def generateOilPressure(alarmon:bool,toadd = 0):
 def generatePotential(alarmon:bool,toadd = 0):
   global Machine_Data
   if alarmon:
-    batterypotential  = Machine_Data["decoded_payload"]['rpm'] + toadd
+    batterypotential  = Machine_Data["decoded_payload"]['battery_potential'] + toadd
   elif !brokenmachine:
-    batterypotential = Mahcine_Data["decodec_payload"]['rpm'] + random.choice([-50,200])
+    batterypotential = Mahcine_Data["decodec_payload"]['battery_potential'] + random.choice([-0.1,0.2])
   else:
-    batterypotential = Machine_Data["decoded_payload"]['rpm'] + 100
+    batterypotential = Machine_Data["decoded_payload"]['battery_potential'] + 0.1
     batterypotential = max(10,min(battery_potential),14)
     Machine_Date["decoded_payload"]['battery_potential'] = batterypotential
 
 
 
-def generateRPM(alarmon:bool,toadd = 0):
+def generateConsumption(alarmon:bool,toadd = 0):
   global Machine_Data
   if alarmon:
-    rpm  = Machine_Data["decoded_payload"]['rpm'] + toadd
+    consump  = Machine_Data["decoded_payload"]['rpm'] + toadd
   elif !brokenmachine:
-    rpm = Mahcine_Data["decodec_payload"]['rpm'] + random.choice([-50,200])
+    consump = Mahcine_Data["decodec_payload"]['rpm'] + random.choice([-50,200])
   else:
-    rpm = Machine_Data["decoded_payload"]['rpm'] + 100
+     consump = Machine_Data["decoded_payload"]['rpm'] + 100
 
     Machine_Date["decoded_payload"]['rpm'] = rpm
 
