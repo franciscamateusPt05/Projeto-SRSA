@@ -8,7 +8,7 @@ from influxdb_client.client.write_api import SYNCHRONOUS
 
 
 class DataManagerAgent:
-    def __init__(self, group_id, broker_ip="10.6.1.9", broker_port=1883):
+    def __init__(self, group_id, broker_ip="test.mosquitto.org", broker_port=1883):
         self.group_id = group_id
         self.broker_ip = broker_ip
         self.broker_port = broker_port

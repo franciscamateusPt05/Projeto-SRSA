@@ -56,10 +56,9 @@ class MQTTDebugger:
 
 
 if __name__ == "__main__":
-    # Configuration - these should be passed as parameters or from config file
-    BROKER_ADDRESS = "10.6.1.9"  # srsa-pi-8.dei.ac.pt
+    BROKER_ADDRESS = "10.6.1.9"
     BROKER_PORT = 1883
-    GROUP_ID = "100"  # Example group ID - should be provided
+    GROUP_ID = "100"
 
     debugger = MQTTDebugger(BROKER_ADDRESS, BROKER_PORT, GROUP_ID)
 
