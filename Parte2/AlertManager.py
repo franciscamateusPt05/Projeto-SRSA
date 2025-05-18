@@ -17,7 +17,7 @@ class AlertManager:
         self.mqtt_client = mqtt.Client()
         self.mqtt_client.on_message = self.on_mqtt_message
         self.mqtt_client.connect("10.6.1.9", 1883)
-        self.mqtt_client.subscribe(f"{self.group_id}/machine_control")
+        self.mqtt_client.subscribe(f"{self.group_id}/internal/control")
 
         # UDP socket setup
         self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -58,18 +58,28 @@ class AlertManager:
                     critical_count += len(recent_times)
 
         if critical_count > 3 or total_count > 5:
-            return "CRITICAL"
-        elif total_count > 2:
-            return "WARNING"
+            status = "CRITICAL"
         else:
-            return "NORMAL"
+            status = "NORMAL"
 
-    def send_alert(self, machine_type, status):
+        if critical_count > 3 and total_count > 5:
+            reason = "Critical parameters and total alarms exceeded"
+        elif critical_count > 3:
+            reason = "Critical parameters exceeded"
+        elif total_count > 5 :
+            reason = "Too many alarms"
+        else:
+            reason = "No recent alarms"
+
+        return status, reason
+
+    def send_alert(self, machine_type, status, reason):
         alert_msg = {
             "message_type": "alert",
             "machine_type": machine_type,
             "status": status,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
+            "reason": reason
         }
         self.udp_socket.sendto(json.dumps(alert_msg).encode(), (self.udp_host, self.udp_port))
         print(f"Sent {status} alert for {machine_type} via UDP")

@@ -135,7 +135,7 @@ class MachineDataManager:
 
         for alarm in alarms:
             alarm['machine_type'] = machine_type
-            topic = f"{self.group_id}/control_commands"
+            topic = f"{self.group_id}/internal/control"
             self.mqtt_client.publish(topic, json.dumps(alarm))
     
     def run(self):
@@ -149,7 +149,6 @@ class MachineDataManager:
             self.mqtt_client.disconnect()
 
 if __name__ == "__main__":
-    # Group ID should be provided as argument
     import sys
     if len(sys.argv) < 2:
         print("Usage: python machine_data_manager.py <GroupID>")
