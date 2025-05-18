@@ -7,15 +7,16 @@ import paho.mqtt.client as mqtt
 
 # Config do ficheiro
 GroupID = sys.argv[1]
-MACHINE_UPDATE_TIME = sys.argv[2] # pode ser alterado 
-Machine_Code = sys.argv[3]
+MACHINE_UPDATE_TIME = sys.argv[2] # pode ser alterado
+Machine_Code =sys.argv[3]
+CodeMachine={"A23X":1,"B47Y":2,"C89Z":3,"D56W":4,"E34V":5,"F78T":6,"G92Q":7,"H65P":8}
 
 # TOPICOS
 # para enviar
-network_topic = f'v3/{GroupID}@ttn/devices/{MachineID}/up'
+network_topic = f'v3/{GroupID}@ttn/devices/{CodeMachine[Machine_Code]}/up'
 # para receber
-DataManagerAgent_topic = f'v3/{GroupID}@ttn/devices/{MahcineID}/down/push_actuator'
-AlertManger_topic = f'v3/{GroupID}@ttn/devices/{MachineID}/down/push_alert'
+DataManagerAgent_topic = f'v3/{GroupID}@ttn/devices/{CodeMachine[Machine_Code]}/down/push_actuator'
+AlertManger_topic = f'v3/{GroupID}@ttn/devices/{CodeMachine[Machine_Code]}/down/push_alert'
 
 
 mqtthost = "10.6.1.9"
@@ -39,7 +40,6 @@ unidades = {"OilPressure":[0,1,0,1,0,1,0,1],
             "Consumption":[1,0,0,1,0,1,1,0]
             }
 
-CodeMachine={"A23X":1,"B47Y":2,"C89Z":3,"D56W":4,"E34V":5,"F78T":6,"G92Q":7,"H65P":8}
 
 Machine_Data= { 
   "end_device_ids": { 
