@@ -14,6 +14,8 @@ CodeMachine={"A23X":1,"B47Y":2,"C89Z":3,"D56W":4,"E34V":5,"F78T":6,"G92Q":7,"H65
 # TOPICOS
 # para enviar
 network_topic = f'v3/{GroupID}@ttn/devices/{CodeMachine[Machine_Code]}/up'
+
+
 # para receber
 DataManagerAgent_topic = f'v3/{GroupID}@ttn/devices/{CodeMachine[Machine_Code]}/down/push_actuator'
 AlertManger_topic = f'v3/{GroupID}@ttn/devices/{CodeMachine[Machine_Code]}/down/push_alert'
@@ -29,9 +31,16 @@ def on_connect():
   pass
 
 def on_message(topic):
-  if topic == 
-  pass
+  if topic == DataManagerAgent_topic:
+    processDMA(msg.payload)
+  elif topic == AlertManager_topic:
+    processAM(msg.payload)
 
+
+
+def processDMA(payload):
+  control = 0x01
+  action = 0x02
 
 
 unidades = {"OilPressure":[0,1,0,1,0,1,0,1],
@@ -133,9 +142,6 @@ def generateConsumption(alarmon:bool,toadd = 0):
      consump = Machine_Data["decoded_payload"]['rpm'] + 100
 
     Machine_Date["decoded_payload"]['rpm'] = rpm
-
-
-
 
 
 def generatenewdata():

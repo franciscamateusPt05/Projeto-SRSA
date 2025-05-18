@@ -105,7 +105,7 @@ class DataManagerAgent:
         # Encode control message
         encoded = self.encode_control_message(machine_type,action, parameter, corretion)
         machine_id=self.CodeMachine[machine_type]
-        topic = f"v3/{self.group_id}@ttn/devices/{machine_id}/down/push_machine"
+        topic = f"v3/{self.group_id}@ttn/devices/{machine_id}/down/push_actuator"
         downlink_msg = {
             "downlinks": [{
                 "frm_payload": encoded,
