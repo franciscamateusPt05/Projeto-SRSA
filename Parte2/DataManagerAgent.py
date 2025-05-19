@@ -66,16 +66,15 @@ class DataManagerAgent:
             'battery_potencial': decoded.get('battery_potential'),
             'consumption': decoded.get('consumption'),
             'machine_type': decoded.get('machine_type'),
-            'rssi': payload.get('rx_metadata', [{}])[0].get('rssi'),
-            'snr': payload.get('rx_metadata', [{}])[0].get('snr'),
-            'channel_rssi': payload.get('rx_metadata', [{}])[0].get('channel_rssi')
+            'rssi': payload.get('uplink_message', {}).get('rx_metadata', [{}])[0].get('rssi'),
+            'snr': payload.get('uplink_message', {}).get('rx_metadata', [{}])[0].get('snr'),
+            'channel_rssi': payload.get('uplink_message', {}).get('rx_metadata', [{}])[0].get('channel_rssi'),
+
         }
         self.standardize_units(machine_id)
         self.send_to_data_manager(self.machine_data[machine_id])
-        
-        decoded = payload.get('uplink_message', {}).get('rx_metadata', {})[0]
-        print(decoded)
-        self.store_in_database(self.machine_data[machine_id], decoded)
+
+        self.store_in_database(self.machine_data[machine_id])
     
     def standardize_units(self, machine_id):
         data = self.machine_data[machine_id]
@@ -99,12 +98,11 @@ class DataManagerAgent:
     
     def process_control_message(self, payload):
         machine_type = payload.get('machine_type')
-        action = payload.get('action')
         parameter = payload.get('parameter')
-        corretion=payload.get('corretion')
+        corretion=payload.get('correction')
         
         # Encode control message
-        encoded = self.encode_control_message(machine_type,action, parameter, corretion)
+        encoded = self.encode_control_message(machine_type, parameter, corretion)
         machine_id=self.CodeMachine[machine_type]
         topic = f"v3/{self.group_id}@ttn/devices/{machine_id}/down/push_actuator"
         downlink_msg = {
@@ -117,7 +115,7 @@ class DataManagerAgent:
         self.mqtt_client.publish(topic, json.dumps(downlink_msg))
         self.store_control_message_in_database(machine_type, parameter, corretion)
 
-    def encode_control_message(self,machine_type, parameter, corretion):
+    def encode_control_message(self,machine_type, parameter,corretion):
         message_type = 0x01  # Control
         action_type = 0x01   # Modify parameter
         
@@ -125,18 +123,19 @@ class DataManagerAgent:
         param_map = {
             'rpm': 0x01,
             'oil_pressure': 0x02,
-            'coolant_temperatureerature': 0x03,
+            'coolant_temperature': 0x03,
             'battery_potential': 0x04,
             'consumption': 0x05
 }
         
         param_byte = param_map.get(parameter, 0x00)
+        print(corretion)
         value_byte = self.convert_to_signed_byte(self.revert_to_original_units(machine_type, parameter, int(corretion)))
         
         return f"0x{message_type:02x} 0x{action_type:02x} 0x{param_byte:02x} 0x{value_byte:02x}"
     
     def convert_to_signed_byte(self, value):
-        return value & 0xff
+        return int(value) & 0xff
     
     def process_udp_alerts(self):
         while True:
@@ -176,7 +175,7 @@ class DataManagerAgent:
                 corretion = corretion * 14.5038
 
         if machine_type in ['E34V', 'G92Q', 'F78T', 'H65P']:
-            if 'coolant_temperatureerature' == parameter:
+            if 'coolant_temperature' == parameter:
                 # Reverter Celsius para Fahrenheit
                 corretion = (corretion * 9 / 5) + 32
 
@@ -206,7 +205,7 @@ class DataManagerAgent:
         
         return f"0x{message_type:02x} 0x{action_type:02x} 0x{reason_byte:02x}"
     
-    def store_in_database(self, data, metadata):
+    def store_in_database(self, data):
         token = "7WCrrZwZ99icYE8XxxzEXM8EMxjCVwRLQjSM07nurpl0MC91DgytxcuLHimheXi1MI414_1puHHa2z9rq1qHFg=="
         org = "SRSA"
         bucket = "projetoSRSA"
@@ -219,13 +218,13 @@ class DataManagerAgent:
                 .tag("machine_id", data.get('machine_id')) \
                 .tag("machine_type", data.get('machine_type')) \
                 .field("rpm", float(data.get('rpm', 0.0))) \
-                .field("coolant_temperatureerature", float(data.get('coolant_temperature', 0.0))) \
+                .field("coolant_temperature", float(data.get('coolant_temperature', 0.0))) \
                 .field("oil_pressure", float(data.get('oil_pressure', 0.0))) \
                 .field("battery_potencial", float(data.get('battery_potencial', 0.0))) \
                 .field("consumption", float(data.get('consumption', 0.0))) \
-                .field("rssi", float(metadata.get('rssi', 0.0))) \
-                .field("snr", float(metadata.get('snr', 0.0))) \
-                .field("channel_rssi", float(metadata.get('channel_rssi', 0.0))) \
+                .field("rssi", float(data.get('rssi', 0.0))) \
+                .field("snr", float(data.get('snr', 0.0))) \
+                .field("channel_rssi", float(data.get('channel_rssi', 0.0))) \
                 .time(datetime.utcnow(), WritePrecision.NS)
 
             write_api.write(bucket, org, point)
@@ -242,7 +241,7 @@ class DataManagerAgent:
             point = Point("control_messages") \
                 .tag("machine_type", machine_type) \
                 .tag("parameter", parameter) \
-                .field("correction_value", corretion) \
+                .field("correction_value", int(corretion)) \
                 .time(datetime.utcnow(), WritePrecision.NS)
 
             write_api.write(bucket=bucket, org=org, record=point)

@@ -149,11 +149,7 @@ class MachineDataManager:
             self.mqtt_client.disconnect()
 
 if __name__ == "__main__":
-    import sys
-    if len(sys.argv) < 2:
-        print("Usage: python machine_data_manager.py <GroupID>")
-        sys.exit(1)
-    
+
     group_id = 15
     manager = MachineDataManager(group_id)
     manager.run()
