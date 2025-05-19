@@ -37,7 +37,7 @@ class MQTTDebugger:
             # If not JSON, display raw message
             formatted_message = msg.payload.decode()
 
-        print(f"[{current_time}]:[{msg.topic}]:\n{formatted_message}\n")
+        print(f"[{current_time}]:[{msg.topic}]")
 
     def on_disconnect(self, client, userdata, rc):
         """Callback when disconnected from the MQTT broker"""
@@ -58,7 +58,7 @@ class MQTTDebugger:
 if __name__ == "__main__":
     BROKER_ADDRESS = "10.6.1.9"
     BROKER_PORT = 1883
-    GROUP_ID = "100"
+    GROUP_ID = "15"
 
     debugger = MQTTDebugger(BROKER_ADDRESS, BROKER_PORT, GROUP_ID)
 

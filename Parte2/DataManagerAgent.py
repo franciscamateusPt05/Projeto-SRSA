@@ -1,3 +1,5 @@
+import threading
+
 import paho.mqtt.client as mqtt
 import socket
 import json
@@ -19,10 +21,10 @@ class DataManagerAgent:
         self.mqtt_client.on_message = self.on_mqtt_message
         
         # UDP setup for Alert Manager
+        self.udp_host='127.0.0.1'
+        self.udp_port = 5002
         self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.udp_port = 10000  # Example port, can be configured
-        self.udp_socket.bind(('localhost', self.udp_port))
-        
+        self.udp_socket.bind((self.udp_host, self.udp_port))
         # Internal state
         self.CodeMachine={"A23X":"M1","B47Y":"M2","C89Z":"M3","D56W":"M4","E34V":"M5","F78T":"M6","G92Q":"M7","H65P":"M8"}
         self.machine_ids=self.CodeMachine.values()
@@ -44,8 +46,6 @@ class DataManagerAgent:
         try:
             payload = json.loads(msg.payload.decode())
             topic = msg.topic
-            
-            print(f"[DEBUG] Received MQTT message on {topic}: {payload}")
             
             if "up" in topic:  # Message from machine
                 self.process_machine_message(payload, topic)
@@ -129,23 +129,31 @@ class DataManagerAgent:
 }
         
         param_byte = param_map.get(parameter, 0x00)
-        print(corretion)
         value_byte = self.convert_to_signed_byte(self.revert_to_original_units(machine_type, parameter, int(corretion)))
         
         return f"0x{message_type:02x} 0x{action_type:02x} 0x{param_byte:02x} 0x{value_byte:02x}"
     
     def convert_to_signed_byte(self, value):
         return int(value) & 0xff
-    
+
     def process_udp_alerts(self):
+        print(f"[UDP] A ouvir em {self.udp_host}:{self.udp_port}...")
         while True:
-            data, addr = self.udp_socket.recvfrom(1024)
             try:
-                alert = json.loads(data.decode())
+                data, addr = self.udp_socket.recvfrom(4096)
+                message = data.decode()
+                alert = json.loads(message)  # Aqui tens o payload já em dicionário
+                print(f"[UDP] Received Alert: {alert}")
+
                 self.handle_alert(alert)
+
+            except json.JSONDecodeError as json_err:
+                print(f"[UDP] Erro ao decodificar JSON: {json_err}")
+                print(f"[UDP] Dados brutos: {data}")
+
             except Exception as e:
-                print(f"Error processing UDP alert: {e}")
-    
+                print(f"[UDP] Erro inesperado ao processar alerta: {e}")
+
     def handle_alert(self, alert):
         machine_type = alert.get('machine_type')
         machine_id = self.CodeMachine[machine_type]
@@ -155,6 +163,7 @@ class DataManagerAgent:
         if alert_level == "CRITICAL":
             # Encode alert message
             encoded = self.encode_alert_message(reason)
+            print(encoded)
             
             # Send to machine
             topic = f"v3/{self.group_id}@ttn/devices/{machine_id}/down/push_alert"
@@ -165,7 +174,10 @@ class DataManagerAgent:
                     "priority": "NORMAL"
                 }]
             }
-            self.mqtt_client.publish(topic, json.dumps(downlink_msg))
+            try:
+                self.mqtt_client.publish(topic, json.dumps(downlink_msg))
+            except Exception as e:
+                print(f"[UDP] Erro ao processar alerta: {e}")
             self.store_alert_message_in_database(machine_type, reason, alert_level)
     def revert_to_original_units(self, machine_type, parameter, corretion):
 
@@ -177,7 +189,10 @@ class DataManagerAgent:
         if machine_type in ['E34V', 'G92Q', 'F78T', 'H65P']:
             if 'coolant_temperature' == parameter:
                 # Reverter Celsius para Fahrenheit
-                corretion = (corretion * 9 / 5) + 32
+                if corretion < 0:
+                    corretion = -((abs(corretion) * 9 / 5) + 32)
+                else:
+                    corretion = (corretion * 9 / 5) + 32
 
         if machine_type in ['H65P']:
             if 'battery_potential' == parameter:
@@ -266,17 +281,13 @@ class DataManagerAgent:
     def start(self):
         # Connect to MQTT broker
         self.mqtt_client.connect(self.broker_ip, self.broker_port, 60)
-        
-        # Start MQTT loop in a separate thread
         self.mqtt_client.loop_start()
-        
-        # Start UDP listener
-        import threading
-        udp_thread = threading.Thread(target=self.process_udp_alerts, daemon=True)
+
+        udp_thread = threading.Thread(target=self.process_udp_alerts(), daemon=True)
         udp_thread.start()
         
         print("Data Manager Agent started")
-        
+
         try:
             while True:
                 time.sleep(1)
@@ -288,6 +299,6 @@ class DataManagerAgent:
 
 
 if __name__ == "__main__":
-    group_id = "15"  # Replace with your group ID
+    group_id = "15"
     agent = DataManagerAgent(group_id)
     agent.start()
