@@ -23,7 +23,6 @@ AlertManger_topic = f'v3/{GroupID}@ttn/devices/M{CodeMachine[Machine_Code]}/down
 
 
 mqtthost = "10.6.1.9"
-mqtthost = "broker.hivemq.com"
 mqttport = 1883
 
 
