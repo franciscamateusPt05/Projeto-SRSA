@@ -8,7 +8,7 @@ from influxdb_client.client.write_api import SYNCHRONOUS
 
 
 class DataManagerAgent:
-    def __init__(self, group_id, broker_ip="test.mosquitto.org", broker_port=1883):
+    def __init__(self, group_id, broker_ip="10.6.1.9", broker_port=1883):
         self.group_id = group_id
         self.broker_ip = broker_ip
         self.broker_port = broker_port
@@ -61,7 +61,7 @@ class DataManagerAgent:
         self.machine_data[machine_id] = {
             'timestamp': datetime.now().isoformat(), #Este é quando recebo devia ser o quando foi retirado o valor?
             'rpm': decoded.get('rpm'),
-            'coolant_temp': decoded.get('coolant_temperature'),
+            'coolant_temperature': decoded.get('coolant_temperatureerature'),
             'oil_pressure': decoded.get('oil_pressure'),
             'battery_potencial': decoded.get('battery_potential'),
             'consumption': decoded.get('consumption'),
@@ -73,8 +73,9 @@ class DataManagerAgent:
         self.standardize_units(machine_id)
         self.send_to_data_manager(self.machine_data[machine_id])
         
-        # Store in InfluxDB
-        self.store_in_database(self.machine_data[machine_id])
+        decoded = payload.get('uplink_message', {}).get('rx_metadata', {})[0]
+        print(decoded)
+        self.store_in_database(self.machine_data[machine_id], decoded)
     
     def standardize_units(self, machine_id):
         data = self.machine_data[machine_id]
@@ -83,8 +84,8 @@ class DataManagerAgent:
             if 'oil_pressure' in data:
                 data['oil_pressure'] = data['oil_pressure']/ 14.5038
         if machine_type in ['E34V', 'G92Q', 'F78T', 'H65P']:
-            if 'coolant_temp' in data:
-                data['coolant_temp'] = (data['coolant_temp'] - 32) * 5 / 9
+            if 'coolant_temperature' in data:
+                data['coolant_temperature'] = (data['coolant_temperature'] - 32) * 5 / 9
         if machine_type in ['H65P']:
             if 'battery_potential' in data:
                 data['battery_potential'] = data['battery_potential']/1000
@@ -124,7 +125,7 @@ class DataManagerAgent:
         param_map = {
             'rpm': 0x01,
             'oil_pressure': 0x02,
-            'coolant_temp': 0x03,
+            'coolant_temperatureerature': 0x03,
             'battery_potential': 0x04,
             'consumption': 0x05
 }
@@ -175,7 +176,7 @@ class DataManagerAgent:
                 corretion = corretion * 14.5038
 
         if machine_type in ['E34V', 'G92Q', 'F78T', 'H65P']:
-            if 'coolant_temp' == parameter:
+            if 'coolant_temperatureerature' == parameter:
                 # Reverter Celsius para Fahrenheit
                 corretion = (corretion * 9 / 5) + 32
 
@@ -205,35 +206,35 @@ class DataManagerAgent:
         
         return f"0x{message_type:02x} 0x{action_type:02x} 0x{reason_byte:02x}"
     
-    def store_in_database(self, data):
-        token = "36Ke8rj29a96pbA0FXCfJmQz0uiCEUQ3mex8FFElJTnmv0EIlCz8fpvjA7WR1wppsMxlyJScf6gf7PS2-6oi0g=="
+    def store_in_database(self, data, metadata):
+        token = "7WCrrZwZ99icYE8XxxzEXM8EMxjCVwRLQjSM07nurpl0MC91DgytxcuLHimheXi1MI414_1puHHa2z9rq1qHFg=="
         org = "SRSA"
         bucket = "projetoSRSA"
-        url = "https://us-west-2-1.aws.cloud2.influxdata.com"
+        url = "https://us-east-1-1.aws.cloud2.influxdata.com"
         
         with InfluxDBClient(url=url, token=token, org=org) as client:
             write_api = client.write_api(write_options=SYNCHRONOUS)
-            
+
             point = Point("machine_data") \
                 .tag("machine_id", data.get('machine_id')) \
                 .tag("machine_type", data.get('machine_type')) \
-                .field("rpm", data.get('rpm')) \
-                .field("coolant_temp", data.get('coolant_temp')) \
-                .field("oil_pressure", data.get('oil_pressure')) \
-                .field("battery_potencial", data.get('battery_potencial')) \
-                .field("consumption", data.get('consumption')) \
-                .field("rssi", data.get('rssi')) \
-                .field("snr", data.get('snr')) \
-                .field("channel_rssi", data.get('channel_rssi')) \
+                .field("rpm", float(data.get('rpm', 0.0))) \
+                .field("coolant_temperatureerature", float(data.get('coolant_temperature', 0.0))) \
+                .field("oil_pressure", float(data.get('oil_pressure', 0.0))) \
+                .field("battery_potencial", float(data.get('battery_potencial', 0.0))) \
+                .field("consumption", float(data.get('consumption', 0.0))) \
+                .field("rssi", float(metadata.get('rssi', 0.0))) \
+                .field("snr", float(metadata.get('snr', 0.0))) \
+                .field("channel_rssi", float(metadata.get('channel_rssi', 0.0))) \
                 .time(datetime.utcnow(), WritePrecision.NS)
-            
+
             write_api.write(bucket, org, point)
 
     def store_control_message_in_database(self, machine_type, parameter, corretion):
-        token = "36Ke8rj29a96pbA0FXCfJmQz0uiCEUQ3mex8FFElJTnmv0EIlCz8fpvjA7WR1wppsMxlyJScf6gf7PS2-6oi0g=="
+        token = "7WCrrZwZ99icYE8XxxzEXM8EMxjCVwRLQjSM07nurpl0MC91DgytxcuLHimheXi1MI414_1puHHa2z9rq1qHFg=="
         org = "SRSA"
         bucket = "projetoSRSA"
-        url = "https://us-west-2-1.aws.cloud2.influxdata.com"
+        url = "https://us-east-1-1.aws.cloud2.influxdata.com"
 
         with InfluxDBClient(url=url, token=token, org=org) as client:
             write_api = client.write_api(write_options=SYNCHRONOUS)
@@ -247,10 +248,10 @@ class DataManagerAgent:
             write_api.write(bucket=bucket, org=org, record=point)
 
     def store_alert_message_in_database(self, machine_type, reason, status):
-        token = "36Ke8rj29a96pbA0FXCfJmQz0uiCEUQ3mex8FFElJTnmv0EIlCz8fpvjA7WR1wppsMxlyJScf6gf7PS2-6oi0g=="
+        token = "7WCrrZwZ99icYE8XxxzEXM8EMxjCVwRLQjSM07nurpl0MC91DgytxcuLHimheXi1MI414_1puHHa2z9rq1qHFg=="
         org = "SRSA"
         bucket = "projetoSRSA"
-        url = "https://us-west-2-1.aws.cloud2.influxdata.com"
+        url = "https://us-east-1-1.aws.cloud2.influxdata.com"
 
         with InfluxDBClient(url=url, token=token, org=org) as client:
             write_api = client.write_api(write_options=SYNCHRONOUS)
@@ -288,6 +289,6 @@ class DataManagerAgent:
 
 
 if __name__ == "__main__":
-    group_id = "your-group-id"  # Replace with your group ID
+    group_id = "15"  # Replace with your group ID
     agent = DataManagerAgent(group_id)
     agent.start()
