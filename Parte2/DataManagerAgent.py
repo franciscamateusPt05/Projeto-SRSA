@@ -19,13 +19,12 @@ class DataManagerAgent:
         self.mqtt_client = mqtt.Client()
         self.mqtt_client.on_connect = self.on_mqtt_connect
         self.mqtt_client.on_message = self.on_mqtt_message
-        
-        # UDP setup for Alert Manager
+
         self.udp_host='127.0.0.1'
         self.udp_port = 5002
         self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.udp_socket.bind((self.udp_host, self.udp_port))
-        # Internal state
+
         self.CodeMachine={"A23X":"M1","B47Y":"M2","C89Z":"M3","D56W":"M4","E34V":"M5","F78T":"M6","G92Q":"M7","H65P":"M8"}
         self.machine_ids=self.CodeMachine.values()
         self.machine_data = {mid: {} for mid in self.machine_ids}
@@ -33,13 +32,10 @@ class DataManagerAgent:
         
     def on_mqtt_connect(self, client, userdata, flags, rc):
         print(f"Connected to MQTT broker with result code {rc}")
-        
-        # Subscribe to machine data topics
-        
+
         topic = f"v3/{self.group_id}@ttn/devices/+/up"
         client.subscribe(topic)
-        
-        # Subscribe to internal control topic
+
         client.subscribe(self.control_topic)
         
     def on_mqtt_message(self, client, userdata, msg):
@@ -47,7 +43,7 @@ class DataManagerAgent:
             payload = json.loads(msg.payload.decode())
             topic = msg.topic
             
-            if "up" in topic:  # Message from machine
+            if "up" in topic:
                 self.process_machine_message(payload, topic)
             elif topic == self.control_topic:
                 self.process_control_message(payload)
@@ -59,7 +55,7 @@ class DataManagerAgent:
         machine_id = topic.split('/')[4]
         decoded = payload.get('uplink_message', {}).get('decoded_payload', {})
         self.machine_data[machine_id] = {
-            'timestamp': datetime.now().isoformat(), #Este é quando recebo devia ser o quando foi retirado o valor?
+            'timestamp': datetime.now().isoformat(),
             'rpm': decoded.get('rpm'),
             'coolant_temperature': decoded.get('coolant_temperature'),
             'oil_pressure': decoded.get('oil_pressure'),
@@ -116,10 +112,9 @@ class DataManagerAgent:
         self.store_control_message_in_database(machine_type, parameter, corretion)
 
     def encode_control_message(self,machine_type, parameter,corretion):
-        message_type = 0x01  # Control
-        action_type = 0x01   # Modify parameter
-        
-        # Map parameter to byte code
+        message_type = 0x01
+        action_type = 0x01
+
         param_map = {
             'rpm': 0x01,
             'oil_pressure': 0x02,
@@ -142,7 +137,7 @@ class DataManagerAgent:
             try:
                 data, addr = self.udp_socket.recvfrom(4096)
                 message = data.decode()
-                alert = json.loads(message)  # Aqui tens o payload já em dicionário
+                alert = json.loads(message)
                 print(f"[UDP] Received Alert: {alert}")
 
                 self.handle_alert(alert)
@@ -157,15 +152,14 @@ class DataManagerAgent:
     def handle_alert(self, alert):
         machine_type = alert.get('machine_type')
         machine_id = self.CodeMachine[machine_type]
-        alert_level = alert.get('status') # NORMAL, CRITICAL
+        alert_level = alert.get('status')
         reason = alert.get('reason')
         
         if alert_level == "CRITICAL":
             # Encode alert message
             encoded = self.encode_alert_message(reason)
             print(encoded)
-            
-            # Send to machine
+
             topic = f"v3/{self.group_id}@ttn/devices/{machine_id}/down/push_alert"
             downlink_msg = {
                 "downlinks": [{
@@ -183,12 +177,10 @@ class DataManagerAgent:
 
         if machine_type in ['A23X', 'C89Z', 'E34V', 'H65P']:
             if 'oil_pressure' == parameter:
-                # Reverter kPa para PSI
                 corretion = corretion * 14.5038
 
         if machine_type in ['E34V', 'G92Q', 'F78T', 'H65P']:
             if 'coolant_temperature' == parameter:
-                # Reverter Celsius para Fahrenheit
                 if corretion < 0:
                     corretion = -((abs(corretion) * 9 / 5) + 32)
                 else:
@@ -196,20 +188,17 @@ class DataManagerAgent:
 
         if machine_type in ['H65P']:
             if 'battery_potential' == parameter:
-                # Reverter volts para milivolts
                 corretion = corretion * 1000
 
         if machine_type in ['C89Z', 'B47Y', 'E34V', 'H65P']:
             if 'consumption' == parameter:
-                # Reverter l/h para gal/h
                 corretion = corretion / 3.78541
         return corretion
     
     def encode_alert_message(self, reason):
-        message_type = 0x02  # Alert
-        action_type = 0x01   # Stop machine
-        
-        # Map reason to byte code
+        message_type = 0x02
+        action_type = 0x01
+
         reason_map = {
             'Critical parameters and total alarms exceeded': 0x01,
             'Critical parameters exceeded': 0x02,
@@ -279,7 +268,6 @@ class DataManagerAgent:
             write_api.write(bucket=bucket, org=org, record=point)
 
     def start(self):
-        # Connect to MQTT broker
         self.mqtt_client.connect(self.broker_ip, self.broker_port, 60)
         self.mqtt_client.loop_start()
 

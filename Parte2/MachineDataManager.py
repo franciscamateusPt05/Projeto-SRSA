@@ -30,11 +30,9 @@ class MachineDataManager:
         self.setup_mqtt()
         
     def _load_healthy_ranges(self, config_file: str) -> HealthyRanges:
-        """Load healthy ranges from configuration file"""
         with open(config_file, 'r') as f:
             lines = f.readlines()
-            
-        # Parse each line (assuming fixed order as per requirements)
+
         rpm = list(map(float, lines[0].split('#')[0].split()))
         coolant_temp = list(map(float, lines[1].split('#')[0].split()))
         oil_pressure = list(map(float, lines[2].split('#')[0].split()))
@@ -55,7 +53,6 @@ class MachineDataManager:
         )
     
     def setup_mqtt(self):
-        """Configure MQTT client and connect to broker"""
         self.mqtt_client.on_connect = self._on_connect
         self.mqtt_client.on_message = self._on_message
         
@@ -64,10 +61,8 @@ class MachineDataManager:
         self.mqtt_client.loop_start()
 
     def _on_connect(self, client, userdata, flags, rc):
-        """Callback when connected to MQTT broker"""
         print(f"MachineDataManager connected to MQTT broker with result code {rc}")
 
-        # Tópico correto com base no DataManagerAgent
         topic = f"{self.group_id}/internal/machine_data"
         client.subscribe(topic)
         print(f"Subscribed to topic: {topic}")
@@ -78,8 +73,7 @@ class MachineDataManager:
             data = json.loads(msg.payload.decode())
             
             print(f"Received data from machine {data['machine_type']}")
-            
-            # Analyze sensor data and send control commands if needed
+
             self.analyze_sensor_data(data)
             
         except json.JSONDecodeError as e:
@@ -88,43 +82,37 @@ class MachineDataManager:
             print(f"Error processing message: {e}")
     
     def analyze_sensor_data(self, data):
-        """Analyze sensor data and send control commands if parameters are out of range"""
         alarms = []
         machine_type=data["machine_type"]
-        
-        # Check RPM
+
         rpm = data.get("rpm")
         if rpm is not None:
             if rpm < self.healthy_ranges.rpm_low:
                 alarms.append({"parameter": "rpm", "value": rpm, "status": "low","correction":self.healthy_ranges.rpm_ideal-rpm})
             elif rpm > self.healthy_ranges.rpm_high:
                 alarms.append({"parameter": "rpm", "value": rpm, "status": "high","correction":self.healthy_ranges.rpm_ideal-rpm})
-        
-        # Check coolant temperature
+
         coolant_temp = data.get("coolant_temperature")
         if coolant_temp is not None:
             if coolant_temp < self.healthy_ranges.coolant_temp_low:
                 alarms.append({"parameter": "coolant_temperature", "value": coolant_temp, "status": "low","correction":self.healthy_ranges.coolant_temp_ideal-coolant_temp})
             elif coolant_temp > self.healthy_ranges.coolant_temp_high:
                 alarms.append({"parameter": "coolant_temperature", "value": coolant_temp, "status": "high","correction":self.healthy_ranges.coolant_temp_ideal-coolant_temp})
-        
-        # Check oil pressure
+
         oil_pressure = data.get("oil_pressure")
         if oil_pressure is not None:
             if oil_pressure < self.healthy_ranges.oil_pressure_low:
                 alarms.append({"parameter": "oil_pressure", "value": oil_pressure, "status": "low","correction":self.healthy_ranges.oil_pressure_ideal-oil_pressure})
             elif oil_pressure > self.healthy_ranges.oil_pressure_high:
                 alarms.append({"parameter": "oil_pressure", "value": oil_pressure, "status": "high","correction":self.healthy_ranges.oil_pressure_ideal-oil_pressure})
-        
-        # Check battery potential
+
         battery_potential = data.get("battery_potential")
         if battery_potential is not None:
             if battery_potential < self.healthy_ranges.battery_potential_low:
                 alarms.append({"parameter": "battery_potential", "value": battery_potential, "status": "low","correction":self.healthy_ranges.battery_potential_ideal-battery_potential})
             elif battery_potential > self.healthy_ranges.battery_potential_high:
                 alarms.append({"parameter": "battery_potential", "value": battery_potential, "status": "high","correction":self.healthy_ranges.battery_potential_ideal-battery_potential})
-        
-        # Check consumption
+
         consumption = data.get("consumption")
         if consumption is not None:
             if consumption < self.healthy_ranges.consumption_low:
@@ -132,14 +120,12 @@ class MachineDataManager:
             elif consumption > self.healthy_ranges.consumption_high:
                 alarms.append({"parameter": "consumption", "value": consumption, "status": "high","correction":self.healthy_ranges.consumption_ideal-consumption})
 
-
         for alarm in alarms:
             alarm['machine_type'] = machine_type
             topic = f"{self.group_id}/internal/control"
             self.mqtt_client.publish(topic, json.dumps(alarm))
     
     def run(self):
-        """Main loop"""
         try:
             while True:
                 time.sleep(1)
@@ -149,7 +135,6 @@ class MachineDataManager:
             self.mqtt_client.disconnect()
 
 if __name__ == "__main__":
-
     group_id = 15
     manager = MachineDataManager(group_id)
     manager.run()

@@ -11,18 +11,14 @@ class AlertManager:
         self.udp_port = udp_port
         self.critical_params = ['coolant_temperature', 'oil_pressure']
         self.client_number = 0
-
-        # Contadores globais
         self.critical_counter = 0
         self.total_counter = 0
 
-        # MQTT client setup
         self.mqtt_client = mqtt.Client()
         self.mqtt_client.on_message = self.on_mqtt_message
         self.mqtt_client.connect("10.6.1.9", 1883)
         self.mqtt_client.subscribe(f"{self.group_id}/internal/control")
 
-        # UDP socket
         self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
     def on_mqtt_message(self, client, userdata, msg):
@@ -71,7 +67,6 @@ class AlertManager:
         self.udp_socket.sendto(json.dumps(alert_msg).encode(), (self.udp_host, self.udp_port))
         print(f"[ALERT] Sent {status} alert for {machine_type} via UDP")
 
-        # Resetar contadores após envio de alerta
         self.critical_counter = 0
         self.total_counter = 0
 
@@ -85,11 +80,9 @@ class AlertManager:
                 print(f"[UDP] Error receiving data: {e}")
 
     def run(self):
-        # Thread para escutar mensagens UDP recebidas
         udp_thread = threading.Thread(target=self.udp_listener, daemon=True)
         udp_thread.start()
 
-        # MQTT loop principal
         self.mqtt_client.loop_forever()
 
 if __name__ == "__main__":
