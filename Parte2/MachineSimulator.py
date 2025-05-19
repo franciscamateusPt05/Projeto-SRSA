@@ -44,7 +44,6 @@ BatteryPotentialUnits = [12.6,12600] #V,mV
 ConsumptionUnits = [15.8,4.17] # l/h, gal/h
 
 #ideal values
-
 # NormalFlutuations
 RPMSend = [-50,200]
 OilPressureSend = {"0":[-0.1,0.5],"1":[-1.45,7.25]}
@@ -318,6 +317,17 @@ def generateCoolantTemp():
 
   Machine_Data["uplink_message"]["decoded_payload"]['coolant_temperature'] = temp
 
+def update_lorawan_conditions():
+  meta = Machine_Data["uplink_message"]["rx_metadata"][0]
+  # Update RSSI: vary by [-3, 0, +3] dBm, clamp to [-120, -50]
+  meta["rssi"] += choice([-3, 0, 3])
+  meta["rssi"] = max(-120, min(meta["rssi"], -50))
+  # Update SNR: vary by [-0.5, 0, +0.5] dB, clamp to [-20, 10]
+  meta["snr"] += choice([-0.5, 0, 0.5])
+  meta["snr"] = max(-20, min(meta["snr"], 10))
+  # Update channel_rssi: vary by [-3, 0, +3] dBm, clamp to [-120, -50]
+  meta["channel_rssi"] += choice([-3, 0, 3])
+  meta["channel_rssi"] = max(-120, min(meta["channel_rssi"], -50))
 
 def generatenewdata2():
   generateRPM()
@@ -325,6 +335,7 @@ def generatenewdata2():
   generatePotential()
   generateConsumption()
   generateCoolantTemp()
+  update_lorawan_conditions()
 
 def generatenewdata():
     global Machine_Data
