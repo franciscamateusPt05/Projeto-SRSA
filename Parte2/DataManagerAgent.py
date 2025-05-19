@@ -127,8 +127,7 @@ class DataManagerAgent:
             'coolant_temp': 0x03,
             'battery_potential': 0x04,
             'consumption': 0x05
-
-        }
+}
         
         param_byte = param_map.get(parameter, 0x00)
         value_byte = self.convert_to_signed_byte(self.revert_to_original_units(machine_type, parameter, int(corretion)))

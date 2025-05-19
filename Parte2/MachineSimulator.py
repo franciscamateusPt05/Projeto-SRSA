@@ -11,13 +11,16 @@ MACHINE_UPDATE_TIME = sys.argv[2] # pode ser alterado
 Machine_Code =sys.argv[3]
 CodeMachine={"A23X":1,"B47Y":2,"C89Z":3,"D56W":4,"E34V":5,"F78T":6,"G92Q":7,"H65P":8}
 
+machineID = CodeMachine[Machine_Code]
+
 # TOPICOS
 # para enviar
 network_topic = f'v3/{GroupID}@ttn/devices/{CodeMachine[Machine_Code]}/up'
 
-
-# para receber
+# mensagens de controlo
 DataManagerAgent_topic = f'v3/{GroupID}@ttn/devices/{CodeMachine[Machine_Code]}/down/push_actuator'
+
+# mensagens de alerta 
 AlertManger_topic = f'v3/{GroupID}@ttn/devices/{CodeMachine[Machine_Code]}/down/push_alert'
 
 
@@ -25,29 +28,27 @@ mqtthost = "10.6.1.9"
 mqttport = 1883
 
 
-client = mqtt.Client()
+# CONFIGS DA MAQUINA
 
-def on_connect():
-  pass
+TURNOFF = False
+BROKEN  = False
 
-def on_message(topic):
-  if topic == DataManagerAgent_topic:
-    processDMA(msg.payload)
-  elif topic == AlertManager_topic:
-    processAM(msg.payload)
+unidades = {"OilPressure":[1,0,1,0,1,0,1,0],
+        "CoolantTemp":[0,0,0,0,1,1,1,1],
+        "BatteryPotential":[0,0,0,0,0,0,0,1],
+        "Consumption":[0,1,1,0,1,0,0,1]
+        }
+
+# StartValues
+OilPressureUnits = [3.2,46.4] #bar,psi
+CoolantTempUnits = [92.0,197.6] #celsius,farenheit
+BatteryPotencialUnits = [12.6,12600] #V,mV
+ConsumptionUnits = [15.8,4.17] # l/h, gal/h
+
+# NormalFlutuations
+OilPressureUnits = {"0":[-0.1,0.5],"1":[-1.45,7.25]}
 
 
-
-def processDMA(payload):
-  control = 0x01
-  action = 0x02
-
-
-unidades = {"OilPressure":[0,1,0,1,0,1,0,1],
-            "CoolantTemp":[1,1,1,1,0,0,0,0],
-            "BatteryPotential":[1,1,1,1,1,1,1,1],
-            "Consumption":[1,0,0,1,0,1,1,0]
-            }
 
 
 Machine_Data= { 
@@ -65,10 +66,10 @@ Machine_Data= {
     "frm_payload": "BASE64_ENCODED_PAYLOAD", 
     "decoded_payload": { 
       "rpm": 2000.0, 
-      "coolant_temperature": 92.0, 
-      "oil_pressure": 3.2, 
-      "battery_potential": 12.6, 
-      "consumption": 15.8, 
+      "coolant_temperature": CoolantTempUnits[unidades['CoolantTemp'][machineID-1]], 
+      "oil_pressure": OilPressureUnits[unidades["OilPressure"][machineID-1]], 
+      "battery_potential": BatteryPotencialUnits[unidades["BatteryPotential"][machineID-1]], 
+      "consumption": ConsumptionUnits[unidades["Consumption"][machineID-1]], 
       "machine_type": Machine_Code 
     }, 
     "rx_metadata": [ 
@@ -92,6 +93,45 @@ Machine_Data= {
     "consumed_airtime": "0.061696s" 
   } 
 }
+
+
+def on_connect(client, userdata, flags, rc):
+  if rc == 0:
+    print("Connected to MQTT Broker!")
+    client.subscribe(DataManagerAgent_topic)
+    client.subscribe(AlertManger_topic)
+  else:
+    print(f"Failed to connect, return code {rc}")
+
+def on_message(client, userdata, msg):
+  if msg.topic == DataManagerAgent_topic:
+    processDMA(json.loads(msg.payload.decode()))
+  elif msg.topic == AlertManger_topic:
+    procressAM(json.loads(msg.payload.decode()))
+
+
+
+def processDMA(payload):
+  param_map = {
+            '01': 'rpm',
+            '02': 'oil_pressure',
+            '03': 'coolant_temperature',
+            '04': 'battery_potential',
+            '05': 'consumption'
+            }
+  encoded = payload["downlinks"]["from_payload"]
+  bytearr = encoded.split()
+  param = param_map[bytearr[2]]
+  value = bytearr[3]
+  value_int = int(value, 16)
+  if value_int > 127:
+    value_int -= 256
+  print(f"Received param: {param}, value: {value_int}")
+  return param,value_int
+
+
+def procressAM(payload):
+  pass
 
 
 def generateRPM(alarmon:bool,toadd = 0):
