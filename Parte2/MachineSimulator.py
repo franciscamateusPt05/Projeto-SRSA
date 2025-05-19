@@ -3,6 +3,7 @@ import time
 import json
 from random import choice
 from datetime import datetime
+import threading
 import paho.mqtt.client as mqtt
 
 # Config do ficheiro
@@ -16,9 +17,9 @@ machineID = CodeMachine[Machine_Code]
 # para enviar
 network_topic = f'v3/{GroupID}@ttn/devices/M{CodeMachine[Machine_Code]}/up'
 # mensagens de controlo
-DataManagerAgent_topic = f'v3/{GroupID}@ttn/devices/{CodeMachine[Machine_Code]}/down/push_actuator'
+DataManagerAgent_topic = f'v3/{GroupID}@ttn/devices/M{CodeMachine[Machine_Code]}/down/push_actuator'
 # mensagens de alerta 
-AlertManger_topic = f'v3/{GroupID}@ttn/devices/{CodeMachine[Machine_Code]}/down/push_alert'
+AlertManger_topic = f'v3/{GroupID}@ttn/devices/M{CodeMachine[Machine_Code]}/down/push_alert'
 
 
 mqtthost = "10.6.1.9"
@@ -28,9 +29,9 @@ mqttport = 1883
 # CONFIGS DA MAQUINA
 
 TURNOFF = False
-BROKEN  = False
+BROKEN = sys.argv[4].lower() == "true" if len(sys.argv) > 4 else False
 
-unidades = {"oil_pressure":[1,0,1,0,1,0,1,0],
+unidades = {"oil_pressure":[1,0,1,0,1,0,1,0], # 0 means the value is in "normal" units
         "coolant_temperature":[0,0,0,0,1,1,1,1],
         "battery_potential":[0,0,0,0,0,0,0,1],
         "consumption":[0,1,1,0,1,0,0,1]
@@ -54,10 +55,16 @@ ConsumptionSend = {"0":[-1,1],"1":[-0.26,0.26]}
 #AdjustingFlutuations
 RPMadjust = 50
 OilPressureadjust = {"0":0.5,"1":7.25}
-CoolantTempadjust = 0.5
+CoolantTempadjust = 5
 BatteryPotentialadjust = {"0":0.2,"1":200}
 ConsumptionAdjust = {"0":1,"1":0.26}
 
+#IdealVALUES 
+RPMideal = 1100
+oilpressureideal = [3,43.5]
+batteryPotentialideal = [13,13000]
+consumptionideal = [25,6.6]
+coolanttempideal = [90,194] 
 
 #CorrectingFlutuations
 reducingorders = {"rpm":0,"oil_pressure":0,"coolant_temperature":0,"battery_potential":0,"consumption":0}
@@ -106,6 +113,8 @@ Machine_Data= {
 }
 
 
+# Functions of the night
+
 def on_connect(client, userdata, flags, rc):
   if rc == 0:
     print("Connected to MQTT Broker!")
@@ -116,6 +125,7 @@ def on_connect(client, userdata, flags, rc):
 
 def on_message(client, userdata, msg):
   if msg.topic == DataManagerAgent_topic:
+    print("CONTROLER")
     param,valor = processDMA(json.loads(msg.payload.decode()))
     if reducingorders[param]==0:
       if valor < 0:
@@ -124,6 +134,7 @@ def on_message(client, userdata, msg):
         reducingorders[param] = 1
 
   elif msg.topic == AlertManger_topic:
+    print("ALERTA")
     procressAM(json.loads(msg.payload.decode()))
 
 def processDMA(payload):
@@ -134,9 +145,10 @@ def processDMA(payload):
             '04': 'battery_potential',
             '05': 'consumption'
             }
-  encoded = payload["downlinks"]["from_payload"]
+  encoded = payload["downlinks"][0]["frm_payload"]
   bytearr = encoded.split()
-  param = param_map[bytearr[2]]
+  parambit = bytearr[2][2:]
+  param = param_map[parambit]
   value = bytearr[3]
   value_int = int(value, 16)
   if value_int > 127:
@@ -145,18 +157,64 @@ def processDMA(payload):
   return param,value_int
 
 
+
+
 def procressAM(payload):
   global TURNOFF
   TURNOFF = True
 
+def showvalues():
+  decoded = Machine_Data["uplink_message"]["decoded_payload"]
+  print(f"RPM: {decoded['rpm']}")
+  print(f"Oil Pressure: {decoded['oil_pressure']}")
+  print(f"Coolant Temperature: {decoded['coolant_temperature']}")
+  print(f"Battery Potential: {decoded['battery_potential']}")
+  print(f"Consumption: {decoded['consumption']}")
+  print(f"Machine Type: {decoded['machine_type']}")
+
+def checktoreset():
+  global Machine_Data
+  unit_coolant = unidades["coolant_temperature"][machineID-1]
+  coolant_temp = Machine_Data["uplink_message"]["decoded_payload"]["coolant_temperature"]
+
+  # Get all other values
+  rpm = Machine_Data["uplink_message"]["decoded_payload"]["rpm"]
+  oil_pressure = Machine_Data["uplink_message"]["decoded_payload"]["oil_pressure"]
+  battery_potential = Machine_Data["uplink_message"]["decoded_payload"]["battery_potential"]
+  consumption = Machine_Data["uplink_message"]["decoded_payload"]["consumption"]
+
+  # Check temperature threshold depending on unit
+  if (unit_coolant == 0 and coolant_temp < 20) or (unit_coolant == 1 and coolant_temp < 68):
+    if rpm == 0 and oil_pressure == 0 and battery_potential == 0 and consumption == 0:
+      resetmachine()
+
+def resetmachine():
+  global Machine_Data, reducingorders, TURNOFF
+  unit_oil = unidades["oil_pressure"][machineID-1]
+  unit_battery = unidades["battery_potential"][machineID-1]
+  unit_consumption = unidades["consumption"][machineID-1]
+  unit_coolant = unidades["coolant_temperature"][machineID-1]
+
+  Machine_Data["uplink_message"]["decoded_payload"]["rpm"] = RPMideal
+  Machine_Data["uplink_message"]["decoded_payload"]["oil_pressure"] = oilpressureideal[unit_oil]
+  Machine_Data["uplink_message"]["decoded_payload"]["battery_potential"] = batteryPotentialideal[unit_battery]
+  Machine_Data["uplink_message"]["decoded_payload"]["consumption"] = consumptionideal[unit_consumption]
+  Machine_Data["uplink_message"]["decoded_payload"]["coolant_temperature"] = coolanttempideal[unit_coolant]
+
+  for k in reducingorders:
+    reducingorders[k] = 0
+  TURNOFF = False
+
 
 def generateRPM():
     global Machine_Data
-    if reducingorders["rpm"] != 0:
+    if TURNOFF:
+        rpm = 0
+        Machine_Data["uplink_message"]["decoded_payload"]['rpm'] = 0
+        return 
+
+    elif reducingorders["rpm"] != 0:
         rpm = Machine_Data["uplink_message"]["decoded_payload"]['rpm'] + reducingorders["rpm"] * RPMadjust
-    elif TURNOFF:
-      pass
-        # diminuir till zero
     elif not BROKEN:
         rpm = Machine_Data["uplink_message"]["decoded_payload"]['rpm'] + choice(RPMSend)
     else:
@@ -168,11 +226,14 @@ def generateRPM():
 def generateOilPressure():
   global Machine_Data
   unit_index = unidades["oil_pressure"][machineID-1]
-  if reducingorders["oil_pressure"] != 0:
-    oil_pressure = Machine_Data["uplink_message"]["decoded_payload"]['oil_pressure'] + reducingorders["oil_pressure"] * OilPressureadjust[str(unit_index)]
-  elif TURNOFF:
+  if TURNOFF:
     # diminuir till zero
-    oil_pressure = max(0, Machine_Data["uplink_message"]["decoded_payload"]['oil_pressure'] - OilPressureadjust[str(unit_index)])
+    oil_pressure = 0
+    Machine_Data["uplink_message"]["decoded_payload"]['oil_pressure'] = oil_pressure
+    return
+
+  elif reducingorders["oil_pressure"] != 0:
+    oil_pressure = Machine_Data["uplink_message"]["decoded_payload"]['oil_pressure'] + reducingorders["oil_pressure"] * OilPressureadjust[str(unit_index)]
   elif not BROKEN:
     oil_pressure = Machine_Data["uplink_message"]["decoded_payload"]['oil_pressure'] + choice(OilPressureSend[str(unit_index)])
   else:
@@ -190,11 +251,15 @@ def generateOilPressure():
 def generatePotential():
   global Machine_Data
   unit_index = unidades["battery_potential"][machineID-1]
-  if reducingorders["battery_potential"] != 0:
-    potential = Machine_Data["uplink_message"]["decoded_payload"]['battery_potential'] + reducingorders["battery_potential"] * BatteryPotentialadjust[str(unit_index)]
-  elif TURNOFF:
+
+  if TURNOFF:
     # diminuir till zero
-    potential = max(0, Machine_Data["uplink_message"]["decoded_payload"]['battery_potential'] - BatteryPotentialadjust[str(unit_index)])
+    potential = 0
+    Machine_Data["uplink_message"]["decoded_payload"]['battery_potential'] = potential
+    return
+
+  elif reducingorders["battery_potential"] != 0:
+    potential = Machine_Data["uplink_message"]["decoded_payload"]['battery_potential'] + reducingorders["battery_potential"] * BatteryPotentialadjust[str(unit_index)]
   elif not BROKEN:
     potential = Machine_Data["uplink_message"]["decoded_payload"]['battery_potential'] + choice(BatteryPotentialSend[str(unit_index)])
   else:
@@ -211,11 +276,12 @@ def generatePotential():
 def generateConsumption():
   global Machine_Data
   unit_index = unidades["consumption"][machineID-1]
-  if reducingorders["consumption"] != 0:
-    consumption = Machine_Data["uplink_message"]["decoded_payload"]['consumption'] + reducingorders["consumption"] * ConsumptionAdjust[str(unit_index)]
-  elif TURNOFF:
+  if TURNOFF:
     # diminuir till zero
-    consumption = max(0, Machine_Data["uplink_message"]["decoded_payload"]['consumption'] - ConsumptionAdjust[str(unit_index)])
+    Machine_Data["uplink_message"]["decoded_payload"]['consumption'] = 0
+    return
+  elif reducingorders["consumption"] != 0:
+    consumption = Machine_Data["uplink_message"]["decoded_payload"]['consumption'] + reducingorders["consumption"] * ConsumptionAdjust[str(unit_index)]
   elif not BROKEN:
     consumption = Machine_Data["uplink_message"]["decoded_payload"]['consumption'] + choice(ConsumptionSend[str(unit_index)])
   else:
@@ -231,12 +297,14 @@ def generateConsumption():
 
 def generateCoolantTemp():
   global Machine_Data
-  unit_index = unidades["consumption"][machineID-1]
-  if reducingorders["coolant_temperature"] != 0:
-    temp = Machine_Data["uplink_message"]["decoded_payload"]['coolant_temperature'] + reducingorders["coolant_temperature"] * CoolantTempadjust
-  elif TURNOFF:
+  unit_index = unidades["coolant_temperature"][machineID-1]
+  if TURNOFF:
     # diminuir till zero
-    temp = max(0, Machine_Data["uplink_message"]["decoded_payload"]['coolant_temperature'] - CoolantTempadjust)
+    temp = 0
+    Machine_Data["uplink_message"]["decoded_payload"]['coolant_temperature'] = temp
+    return
+  elif reducingorders["coolant_temperature"] != 0:
+    temp = Machine_Data["uplink_message"]["decoded_payload"]['coolant_temperature'] + reducingorders["coolant_temperature"] * CoolantTempadjust
   elif not BROKEN:
     temp = Machine_Data["uplink_message"]["decoded_payload"]['coolant_temperature'] + choice(CoolantTempSend)
   else:
@@ -280,9 +348,29 @@ client.on_message = on_message
 client.connect(mqtthost,mqttport)
 client.loop_start()
 
+def monitor_turnoff_and_reset(delay_seconds=10): 
+  def monitor():
+    global TURNOFF, reducingorders
+    while True:
+      if TURNOFF:
+        time.sleep(delay_seconds)
+        if TURNOFF:
+          resetmachine()
+          for k in reducingorders:
+            reducingorders[k] = 0
+          TURNOFF = False  # Set TURNOFF to False after reset
+      time.sleep(1)
+  t = threading.Thread(target=monitor, daemon=True)
+  t.start()
+
+monitor_turnoff_and_reset(10)  # 10 seconds delay, change as needed
 
 while True:
 
   generatenewdata2()
   client.publish(network_topic, json.dumps(Machine_Data, default=str))
+  print(".")
+  print(reducingorders)
+  showvalues()
+  # checktoreset()
   time.sleep(float(MACHINE_UPDATE_TIME))
