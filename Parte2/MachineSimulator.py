@@ -112,8 +112,6 @@ Machine_Data= {
 }
 
 
-# Functions of the night
-
 def on_connect(client, userdata, flags, rc):
   if rc == 0:
     print("Connected to MQTT Broker!")
@@ -156,8 +154,6 @@ def processDMA(payload):
   return param,value_int
 
 
-
-
 def procressAM(payload):
   global TURNOFF
   TURNOFF = True
@@ -176,13 +172,11 @@ def checktoreset():
   unit_coolant = unidades["coolant_temperature"][machineID-1]
   coolant_temp = Machine_Data["uplink_message"]["decoded_payload"]["coolant_temperature"]
 
-  # Get all other values
   rpm = Machine_Data["uplink_message"]["decoded_payload"]["rpm"]
   oil_pressure = Machine_Data["uplink_message"]["decoded_payload"]["oil_pressure"]
   battery_potential = Machine_Data["uplink_message"]["decoded_payload"]["battery_potential"]
   consumption = Machine_Data["uplink_message"]["decoded_payload"]["consumption"]
 
-  # Check temperature threshold depending on unit
   if (unit_coolant == 0 and coolant_temp < 20) or (unit_coolant == 1 and coolant_temp < 68):
     if rpm == 0 and oil_pressure == 0 and battery_potential == 0 and consumption == 0:
       resetmachine()
@@ -242,7 +236,6 @@ def generateOilPressure():
   else:
     oil_pressure = Machine_Data["uplink_message"]["decoded_payload"]['oil_pressure'] + OilPressureadjust[str(unit_index)]
 
-  # Clamp values to a reasonable range (example: 1.5 to 8.0 for bar, 20 to 120 for psi)
   if unit_index == 0:
     oil_pressure = max(1.5, min(oil_pressure, 8.0))
   else:
@@ -270,7 +263,6 @@ def generatePotential():
   else:
     potential = Machine_Data["uplink_message"]["decoded_payload"]['battery_potential'] + BatteryPotentialadjust[str(unit_index)]
 
-  # Clamp values to a reasonable range (example: 10 to 14 for V, 10000 to 14000 for mV)
   if unit_index == 0:
     potential = max(10, min(potential, 14))
   else:
@@ -294,7 +286,6 @@ def generateConsumption():
   else:
     consumption = Machine_Data["uplink_message"]["decoded_payload"]['consumption'] + ConsumptionAdjust[str(unit_index)]
 
-  # Clamp values to a reasonable range (example: 1 to 50 for l/h, 0.26 to 13 for gal/h)
   if unit_index == 0:
     consumption = max(1, min(consumption, 50))
   else:
@@ -361,12 +352,12 @@ def monitor_turnoff_and_reset(delay_seconds=10):
           resetmachine()
           for k in reducingorders:
             reducingorders[k] = 0
-          TURNOFF = False  # Set TURNOFF to False after reset
+          TURNOFF = False 
       time.sleep(1)
   t = threading.Thread(target=monitor, daemon=True)
   t.start()
 
-monitor_turnoff_and_reset(10)  # 10 seconds delay, change as needed
+monitor_turnoff_and_reset(10) # 10 segundos
 
 while True:
 
@@ -375,5 +366,4 @@ while True:
   print(".")
   print(reducingorders)
   showvalues()
-  # checktoreset()
   time.sleep(float(MACHINE_UPDATE_TIME))
