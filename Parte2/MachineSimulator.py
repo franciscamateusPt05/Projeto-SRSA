@@ -23,11 +23,11 @@ AlertManger_topic = f'v3/{GroupID}@ttn/devices/M{CodeMachine[Machine_Code]}/down
 
 
 mqtthost = "10.6.1.9"
+mqtthost = "broker.hivemq.com"
 mqttport = 1883
 
 
 # CONFIGS DA MAQUINA
-
 TURNOFF = False
 BROKEN = sys.argv[4].lower() == "true" if len(sys.argv) > 4 else False
 
@@ -52,7 +52,7 @@ BatteryPotentialSend = {"0":[-0.1,0.2],"1":[-100,200]}
 ConsumptionSend = {"0":[-1,1],"1":[-0.26,0.26]}
 
 #AdjustingFlutuations
-RPMadjust = 50
+RPMadjust = 250
 OilPressureadjust = {"0":0.5,"1":7.25}
 CoolantTempadjust = 5
 BatteryPotentialadjust = {"0":0.2,"1":200}
@@ -214,6 +214,8 @@ def generateRPM():
 
     elif reducingorders["rpm"] != 0:
         rpm = Machine_Data["uplink_message"]["decoded_payload"]['rpm'] + reducingorders["rpm"] * RPMadjust
+        if (reducingorders["rpm"] == -1 and rpm <= RPMideal) or (reducingorders["rpm"] == 1 and rpm >= RPMideal):
+            reducingorders["rpm"] = 0
     elif not BROKEN:
         rpm = Machine_Data["uplink_message"]["decoded_payload"]['rpm'] + choice(RPMSend)
     else:
@@ -233,6 +235,8 @@ def generateOilPressure():
 
   elif reducingorders["oil_pressure"] != 0:
     oil_pressure = Machine_Data["uplink_message"]["decoded_payload"]['oil_pressure'] + reducingorders["oil_pressure"] * OilPressureadjust[str(unit_index)]
+    if (reducingorders["oil_pressure"]==-1 and oil_pressure <= oilpressureideal[unit_index]) or (reducingorders["oil_pressure"]==1 and oil_pressure >= oilpressureideal[unit_index]):
+      reducingorders["oil_pressure"] = 0
   elif not BROKEN:
     oil_pressure = Machine_Data["uplink_message"]["decoded_payload"]['oil_pressure'] + choice(OilPressureSend[str(unit_index)])
   else:
@@ -259,6 +263,8 @@ def generatePotential():
 
   elif reducingorders["battery_potential"] != 0:
     potential = Machine_Data["uplink_message"]["decoded_payload"]['battery_potential'] + reducingorders["battery_potential"] * BatteryPotentialadjust[str(unit_index)]
+    if (reducingorders["battey_potential"]==-1 and potential <= batteryPotentialideal[unit_index]) or (reducingorders["battery_potential"]==1 and potential >= batteryPotentialideal[unit_index]):
+      reducingorders["battery_potential"] = 0
   elif not BROKEN:
     potential = Machine_Data["uplink_message"]["decoded_payload"]['battery_potential'] + choice(BatteryPotentialSend[str(unit_index)])
   else:
@@ -281,6 +287,8 @@ def generateConsumption():
     return
   elif reducingorders["consumption"] != 0:
     consumption = Machine_Data["uplink_message"]["decoded_payload"]['consumption'] + reducingorders["consumption"] * ConsumptionAdjust[str(unit_index)]
+    if (reducingorders["consumption"]==-1 and consumption <= consumptionideal[unit_index]) or (reducingorders["consumption"]==1 and consumption >= consumptionideal[unit_index]):
+      reducingorders["consumption"] = 0
   elif not BROKEN:
     consumption = Machine_Data["uplink_message"]["decoded_payload"]['consumption'] + choice(ConsumptionSend[str(unit_index)])
   else:
@@ -304,12 +312,14 @@ def generateCoolantTemp():
     return
   elif reducingorders["coolant_temperature"] != 0:
     temp = Machine_Data["uplink_message"]["decoded_payload"]['coolant_temperature'] + reducingorders["coolant_temperature"] * CoolantTempadjust
+    if (reducingorders["coolant_temperature"]==-1 and temp <= coolanttempideal[unit_index]) or (reducingorders["coolant_temperature"]==1 and temp >= coolanttempideal[unit_index]):
+      reducingorders["coolant_temperature"] = 0
+    
   elif not BROKEN:
     temp = Machine_Data["uplink_message"]["decoded_payload"]['coolant_temperature'] + choice(CoolantTempSend)
   else:
     temp = Machine_Data["uplink_message"]["decoded_payload"]['coolant_temperature'] + CoolantTempadjust
 
-  # Clamp values to a reasonable range (example: 70 to 130 for Celsius, 158 to 266 for Fahrenheit)
   if unit_index == 0:
     temp = max(70, min(temp, 130))
   else:
@@ -319,13 +329,10 @@ def generateCoolantTemp():
 
 def update_lorawan_conditions():
   meta = Machine_Data["uplink_message"]["rx_metadata"][0]
-  # Update RSSI: vary by [-3, 0, +3] dBm, clamp to [-120, -50]
   meta["rssi"] += choice([-3, 0, 3])
   meta["rssi"] = max(-120, min(meta["rssi"], -50))
-  # Update SNR: vary by [-0.5, 0, +0.5] dB, clamp to [-20, 10]
   meta["snr"] += choice([-0.5, 0, 0.5])
   meta["snr"] = max(-20, min(meta["snr"], 10))
-  # Update channel_rssi: vary by [-3, 0, +3] dBm, clamp to [-120, -50]
   meta["channel_rssi"] += choice([-3, 0, 3])
   meta["channel_rssi"] = max(-120, min(meta["channel_rssi"], -50))
 
@@ -336,21 +343,6 @@ def generatenewdata2():
   generateConsumption()
   generateCoolantTemp()
   update_lorawan_conditions()
-
-def generatenewdata():
-    global Machine_Data
-    rpm = Machine_Data["uplink_message"]["decoded_payload"]["rpm"] + choice([-50,200])
-    oilpressure = Machine_Data["uplink_message"]["decoded_payload"]["oil_pressure"] + choice([-0.1,0.5])
-    batterypontential = Machine_Data["uplink_message"]["decoded_payload"]["battery_potential"] + choice([-0.1,0.2])
-    consumption =       Machine_Data["uplink_message"]["decoded_payload"]["consumption"] + choice([-1,1])
-    coolanttemp =       Machine_Data["uplink_message"]["decoded_payload"]["coolant_temperature"] + choice([-0.3,1.0])
-      
-    Machine_Data["uplink_message"]["decoded_payload"]["rpm"] = max(800,min(rpm,3000))
-    Machine_Data["uplink_message"]["decoded_payload"]["oil_pressure"] = max(1.5,min(oilpressure,8.0))
-    Machine_Data["uplink_message"]["decoded_payload"]["battery_potential"] = max(10,min(batterypontential,14))
-    Machine_Data["uplink_message"]["decoded_payload"]["consumption"] = max(1,min(consumption,50))
-    Machine_Data["uplink_message"]["decoded_payload"]["coolant_temperature"] = max(70,min(coolanttemp,130))
-
 
 client = mqtt.Client()
 client.on_connect = on_connect
