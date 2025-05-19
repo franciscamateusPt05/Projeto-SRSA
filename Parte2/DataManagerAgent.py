@@ -61,7 +61,7 @@ class DataManagerAgent:
         self.machine_data[machine_id] = {
             'timestamp': datetime.now().isoformat(), #Este é quando recebo devia ser o quando foi retirado o valor?
             'rpm': decoded.get('rpm'),
-            'coolant_temperature': decoded.get('coolant_temperatureerature'),
+            'coolant_temperature': decoded.get('coolant_temperature'),
             'oil_pressure': decoded.get('oil_pressure'),
             'battery_potencial': decoded.get('battery_potential'),
             'consumption': decoded.get('consumption'),

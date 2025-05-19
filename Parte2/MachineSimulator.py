@@ -15,7 +15,7 @@ machineID = CodeMachine[Machine_Code]
 
 # TOPICOS
 # para enviar
-network_topic = f'v3/{GroupID}@ttn/devices/{CodeMachine[Machine_Code]}/up'
+network_topic = f'v3/{GroupID}@ttn/devices/M{CodeMachine[Machine_Code]}/up'
 
 # mensagens de controlo
 DataManagerAgent_topic = f'v3/{GroupID}@ttn/devices/{CodeMachine[Machine_Code]}/down/push_actuator'
@@ -46,7 +46,13 @@ BatteryPotencialUnits = [12.6,12600] #V,mV
 ConsumptionUnits = [15.8,4.17] # l/h, gal/h
 
 # NormalFlutuations
-OilPressureUnits = {"0":[-0.1,0.5],"1":[-1.45,7.25]}
+OilPressureSend = {"0":[-0.1,0.5],"1":[-1.45,7.25]}
+CoolantTempSend = [-0.3,1]
+BatteryPotencialSend = {"0":[-0.1,0.2],"1":[-100,200]}
+ConsumptionSend = {"0":[-1,1],"1":[-0.26,0.26]}
+
+reducingorders = {"rpm":0,"OilPressure":0,"CoolantTemp":0,"BatteryPotential":0,"Consumption":0}
+reducingvalue  = {"rpm":0,"OilPressure":0,"CoolantTemp":0,"BatteryPotential":0,"Consumption":0}
 
 
 
@@ -106,6 +112,7 @@ def on_connect(client, userdata, flags, rc):
 def on_message(client, userdata, msg):
   if msg.topic == DataManagerAgent_topic:
     processDMA(json.loads(msg.payload.decode()))
+    print("DMA")
   elif msg.topic == AlertManger_topic:
     procressAM(json.loads(msg.payload.decode()))
 
@@ -131,14 +138,14 @@ def processDMA(payload):
 
 
 def procressAM(payload):
-  pass
+  print("Recv")
 
 
 def generateRPM(alarmon:bool,toadd = 0):
   global Machine_Data
   if alarmon:
     rpm  = Machine_Data["decoded_payload"]['rpm'] + toadd
-  elif !brokenmachine:
+  elif BROKEN==False:
     rpm = Mahcine_Data["decodec_payload"]['rpm'] + random.choice([-50,200])
   else:
     rpm = Machine_Data["decoded_payload"]['rpm'] + 100
@@ -147,10 +154,10 @@ def generateRPM(alarmon:bool,toadd = 0):
 
 
 def generateOilPressure(alarmon:bool,toadd = 0):
-  global Machine_Data
+  global Machine_Data,BROKEN
   if alarmon:
     oilpressure  = Machine_Data["decoded_payload"]['oil_pressure'] + toadd
-  elif !brokenmachine:
+  elif BROKEN:
     oilpressure = Mahcine_Data["decodec_payload"]['oil_pressure'] + random.choice([-0.1,0.5])
   else:
     oilpressure = Machine_Data["decoded_payload"]['oil_pressure'] + 1.0
@@ -163,7 +170,7 @@ def generatePotential(alarmon:bool,toadd = 0):
   global Machine_Data
   if alarmon:
     batterypotential  = Machine_Data["decoded_payload"]['battery_potential'] + toadd
-  elif !brokenmachine:
+  elif BROKEN==False:
     batterypotential = Mahcine_Data["decodec_payload"]['battery_potential'] + random.choice([-0.1,0.2])
   else:
     batterypotential = Machine_Data["decoded_payload"]['battery_potential'] + 0.1
@@ -176,27 +183,43 @@ def generateConsumption(alarmon:bool,toadd = 0):
   global Machine_Data
   if alarmon:
     consump  = Machine_Data["decoded_payload"]['rpm'] + toadd
-  elif !brokenmachine:
+  elif BROKEN==False:
     consump = Mahcine_Data["decodec_payload"]['rpm'] + random.choice([-50,200])
   else:
      consump = Machine_Data["decoded_payload"]['rpm'] + 100
 
-    Machine_Date["decoded_payload"]['rpm'] = rpm
+  Machine_Date["decoded_payload"]['rpm'] = rpm
 
 
 def generatenewdata():
-  global Machine_Data
-  rpm =               Machine_Data["decoded_payload"]["rpm"] + random.choice([-50,200])
-  oilpressure =       Machine_Data["decoded_payload"]["oil_pressure"] +random.choice([-0.1,0.5])
-  batterypontential = Machine_Data["decoded_payload"]["battery_pontential"] + random.choice([-0.1,0.2])
-  consumption =       Machine_Data["decoded_payload"]["consumption"] + random.choice([-1,1])
-  coolanttemp =       Machine_Data["decoded_payload"]["coolant_temperature"] + random.choice([-0.3,1.0])
-    
-  Machine_Data["decoded_payload"]["rpm"] = max(800,min(rpm,3000))
-  Machine_Data["decoded_payload"]["oil_pressure"] = max(1.5,min(oilpressure,8.0))
-  Machine_Data["decoded_payload"]["battery_pontential"] = max(10,min(batterypontential,14))
-  Machine_Data["decoded_payload"]["consumption"] = max(1,min(consumption,50))
-  Machine_Data["decoded_payload"]["coolant_temperature"] = max(70,min(coolanttemp,130))
+    global Machine_Data
+    rpm = Machine_Data["uplink_message"]["decoded_payload"]["rpm"] + random.choice([-50,200])
+    oilpressure = Machine_Data["uplink_message"]["decoded_payload"]["oil_pressure"] +random.choice([-0.1,0.5])
+    batterypontential = Machine_Data["uplink_message"]["decoded_payload"]["battery_potential"] + random.choice([-0.1,0.2])
+    consumption =       Machine_Data["uplink_message"]["decoded_payload"]["consumption"] + random.choice([-1,1])
+    coolanttemp =       Machine_Data["uplink_message"]["decoded_payload"]["coolant_temperature"] + random.choice([-0.3,1.0])
+      
+    Machine_Data["uplink_message"]["decoded_payload"]["rpm"] = max(800,min(rpm,3000))
+    Machine_Data["uplink_message"]["decoded_payload"]["oil_pressure"] = max(1.5,min(oilpressure,8.0))
+    Machine_Data["uplink_message"]["decoded_payload"]["battery_potential"] = max(10,min(batterypontential,14))
+    Machine_Data["uplink_message"]["decoded_payload"]["consumption"] = max(1,min(consumption,50))
+    Machine_Data["uplink_message"]["decoded_payload"]["coolant_temperature"] = max(70,min(coolanttemp,130))
+
+
+client = mqtt.Client()
+client.on_connect = on_connect
+client.on_message = on_message
+
+client.connect(mqtthost,mqttport)
+client.loop_start()
+
+
+while True:
+
+  generatenewdata()
+  client.publish(network_topic, json.dumps(Machine_Data, default=str))
+  time.sleep(float(MACHINE_UPDATE_TIME))
+
 
 
 

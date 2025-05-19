@@ -1,7 +1,8 @@
 import paho.mqtt.client as mqtt
-import datetime
+from datetime import datetime
 GroupID=''
 topic = f'v3/{GroupID}@ttn/devices/#'
+testtopic = "v3/100@ttn/devices/M1/up"
 broker = '10.6.1.9'
 port = 1883
 
