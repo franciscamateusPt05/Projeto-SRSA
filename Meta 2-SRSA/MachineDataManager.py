@@ -68,7 +68,6 @@ class MachineDataManager:
         print(f"Subscribed to topic: {topic}")
 
     def _on_message(self, client, userdata, msg):
-        """Callback when message is received from MQTT broker"""
         try:
             data = json.loads(msg.payload.decode())
             
